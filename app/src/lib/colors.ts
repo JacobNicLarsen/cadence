@@ -3,6 +3,8 @@ import { useColorScheme } from 'nativewind';
 /**
  * Raw hex colors for use outside className (Reanimated styles, SymbolView tintColor, etc.).
  * Maps to the same design tokens defined in global.css.
+ *
+ * Palette: warm stone neutrals + teal primary + amber secondary.
  */
 
 type ColorPalette = {
@@ -36,63 +38,63 @@ type ColorPalette = {
 };
 
 const light: ColorPalette = {
-  foreground: '#1f2937',
-  background: '#ffffff',
-  card: '#f9fafb',
-  cardForeground: '#1f2937',
-  primary: '#6366f1',
+  foreground: '#1c1917',    // stone-900
+  background: '#fafaf9',    // stone-50
+  card: '#f5f5f4',          // stone-100
+  cardForeground: '#1c1917',
+  primary: '#0d9488',       // teal-600
   primaryForeground: '#ffffff',
-  secondary: '#8b5cf6',
+  secondary: '#f59e0b',     // amber-500
   secondaryForeground: '#ffffff',
-  muted: '#f9fafb',
-  mutedForeground: '#6b7280',
-  accent: '#6366f1',
+  muted: '#f5f5f4',
+  mutedForeground: '#78716c', // stone-500
+  accent: '#0d9488',
   accentForeground: '#ffffff',
-  destructive: '#ef4444',
+  destructive: '#dc2626',   // red-600
   destructiveForeground: '#ffffff',
-  border: '#e5e7eb',
-  input: '#e5e7eb',
-  ring: '#6366f1',
-  success: '#10b981',
+  border: '#e7e5e4',        // stone-200
+  input: '#e7e5e4',
+  ring: '#0d9488',
+  success: '#16a34a',       // green-600
   successForeground: '#ffffff',
-  warning: '#f59e0b',
+  warning: '#d97706',       // amber-600
   warningForeground: '#ffffff',
-  activity: '#6366f1',
-  activityEnd: '#818cf8',
-  pause: '#8b5cf6',
-  pauseEnd: '#a78bfa',
-  getReady: '#f59e0b',
-  getReadyEnd: '#fbbf24',
+  activity: '#0d9488',      // teal-600
+  activityEnd: '#14b8a6',   // teal-500
+  pause: '#8b5cf6',         // violet-500
+  pauseEnd: '#a78bfa',      // violet-400
+  getReady: '#f59e0b',      // amber-500
+  getReadyEnd: '#fbbf24',   // amber-400
 };
 
 const dark: ColorPalette = {
-  foreground: '#f9fafb',
-  background: '#111827',
-  card: '#1f2937',
-  cardForeground: '#f9fafb',
-  primary: '#818cf8',
-  primaryForeground: '#ffffff',
-  secondary: '#a78bfa',
-  secondaryForeground: '#ffffff',
-  muted: '#1f2937',
-  mutedForeground: '#9ca3af',
-  accent: '#818cf8',
-  accentForeground: '#ffffff',
-  destructive: '#f87171',
+  foreground: '#fafaf9',    // stone-50
+  background: '#1c1917',    // stone-900
+  card: '#292524',          // stone-800
+  cardForeground: '#fafaf9',
+  primary: '#2dd4bf',       // teal-400
+  primaryForeground: '#1c1917',
+  secondary: '#fbbf24',     // amber-400
+  secondaryForeground: '#1c1917',
+  muted: '#292524',
+  mutedForeground: '#a8a29e', // stone-400
+  accent: '#2dd4bf',
+  accentForeground: '#1c1917',
+  destructive: '#f87171',   // red-400
   destructiveForeground: '#ffffff',
-  border: '#374151',
-  input: '#374151',
-  ring: '#818cf8',
-  success: '#34d399',
-  successForeground: '#ffffff',
-  warning: '#fbbf24',
-  warningForeground: '#ffffff',
-  activity: '#818cf8',
-  activityEnd: '#a5b4fc',
-  pause: '#a78bfa',
-  pauseEnd: '#c4b5fd',
-  getReady: '#fbbf24',
-  getReadyEnd: '#fde68a',
+  border: '#44403c',        // stone-700
+  input: '#44403c',
+  ring: '#2dd4bf',
+  success: '#4ade80',       // green-400
+  successForeground: '#1c1917',
+  warning: '#fbbf24',       // amber-400
+  warningForeground: '#1c1917',
+  activity: '#2dd4bf',      // teal-400
+  activityEnd: '#5eead4',   // teal-300
+  pause: '#a78bfa',         // violet-400
+  pauseEnd: '#c4b5fd',      // violet-300
+  getReady: '#fbbf24',      // amber-400
+  getReadyEnd: '#fde68a',   // amber-200
 };
 
 export type ThemeColors = ColorPalette;
