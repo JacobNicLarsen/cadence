@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "WebSearch",
+      "WebFetch(domain:reactnativereusables.com)",
+      "WebFetch(domain:www.nativewind.dev)",
+      "WebFetch(domain:nativewind.dev)",
+      "WebFetch(domain:rnr-docs.vercel.app)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:ui.shadcn.com)",
+      "WebFetch(domain:api.github.com)",
+      "mcp__claude_ai_Context7__resolve-library-id",
+      "mcp__claude_ai_Context7__query-docs",
+      "Bash(test:*)",
+      "Bash(ls:*)",
+      "Bash(npx expo:*)",
+      "Bash(npm install:*)",
+      "Bash(gh api:*)"
+    ]
+  }
+}

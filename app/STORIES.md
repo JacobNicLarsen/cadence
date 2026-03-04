@@ -59,7 +59,7 @@ Stack (from Planner):
 
 ## Epic 1: Data Model & Storage
 
-### Story 1.1 — Define habit data types
+### Story 1.1 — Define habit data types ✅
 **As a** developer, **I want** TypeScript types for habits, segments, and session records, **so that** the entire app has a single source of truth.
 
 **Acceptance criteria:**
@@ -72,7 +72,7 @@ Stack (from Planner):
 
 ---
 
-### Story 1.2 — Implement habit storage
+### Story 1.2 — Implement habit storage ✅
 **As a** developer, **I want** CRUD operations for habits in AsyncStorage, **so that** habits persist across restarts.
 
 **Acceptance criteria:**
@@ -86,7 +86,7 @@ Stack (from Planner):
 
 ---
 
-### Story 1.3 — Implement session record storage
+### Story 1.3 — Implement session record storage ✅
 **As a** developer, **I want** to save completed session records, **so that** the completion screen can show a summary.
 
 **Acceptance criteria:**
@@ -97,7 +97,7 @@ Stack (from Planner):
 
 ---
 
-### Story 1.4 — Create data hooks
+### Story 1.4 — Create data hooks ✅
 **As a** developer, **I want** hooks that load habits from storage, **so that** screens access data declaratively.
 
 **Acceptance criteria:**
@@ -111,7 +111,7 @@ Stack (from Planner):
 
 ## Epic 2: Home Screen
 
-### Story 2.1 — Build habit card component
+### Story 2.1 — Build habit card component ✅
 **As a** user, **I want** to see each habit as a card with name, duration, and segment count, **so that** I can quickly pick one.
 
 **Acceptance criteria:**
@@ -126,7 +126,7 @@ Stack (from Planner):
 
 ---
 
-### Story 2.2 — Build home screen
+### Story 2.2 — Build home screen ✅
 **As a** user, **I want** the home screen to list my habits as tappable cards, **so that** I can start one.
 
 **Acceptance criteria:**
@@ -140,7 +140,7 @@ Stack (from Planner):
 
 ---
 
-### Story 2.3 — Update tab navigation
+### Story 2.3 — Update tab navigation ✅
 **As a** user, **I want** Home and Planner tabs, **so that** I can switch between running and managing habits.
 
 **Acceptance criteria:**
@@ -154,7 +154,7 @@ Stack (from Planner):
 
 ## Epic 3: Planner
 
-### Story 3.1 — Build planner list screen
+### Story 3.1 — Build planner list screen ✅
 **As a** user, **I want** to see all my habits in the planner with a create button, **so that** I can manage my routines.
 
 **Acceptance criteria:**
@@ -167,7 +167,7 @@ Stack (from Planner):
 
 ---
 
-### Story 3.2 — Build segment row component
+### Story 3.2 — Build segment row component ✅
 **As a** user, **I want** to see and manage individual segments, **so that** I can customize my routine structure.
 
 **Acceptance criteria:**
@@ -179,7 +179,7 @@ Stack (from Planner):
 
 ---
 
-### Story 3.3 — Build duration input
+### Story 3.3 — Build duration input ✅
 **As a** user, **I want** an easy way to set duration in minutes and seconds, **so that** I can precisely time segments.
 
 **Acceptance criteria:**
@@ -191,7 +191,7 @@ Stack (from Planner):
 
 ---
 
-### Story 3.4 — Build create/edit habit form
+### Story 3.4 — Build create/edit habit form ✅
 **As a** user, **I want** to name a habit and add timed segments, **so that** I can build my custom routine.
 
 **Acceptance criteria:**
@@ -212,7 +212,7 @@ Stack (from Planner):
 
 ## Epic 4: Active Session
 
-### Story 4.1 — Build useTimer hook
+### Story 4.1 — Build useTimer hook ✅
 **As a** developer, **I want** a countdown timer hook, **so that** segments count down accurately.
 
 **Acceptance criteria:**
@@ -226,7 +226,7 @@ Stack (from Planner):
 
 ---
 
-### Story 4.2 — Build timer display
+### Story 4.2 — Build timer display ✅
 **As a** user, **I want** a large countdown and progress bar, **so that** I can track time at a glance.
 
 **Acceptance criteria:**
@@ -239,7 +239,7 @@ Stack (from Planner):
 
 ---
 
-### Story 4.3 — Build segment progress indicator
+### Story 4.3 — Build segment progress indicator ✅
 **As a** user, **I want** to see which segment I'm on, **so that** I know overall progress.
 
 **Acceptance criteria:**
@@ -250,7 +250,7 @@ Stack (from Planner):
 
 ---
 
-### Story 4.4 — Build active session screen
+### Story 4.4 — Build active session screen ✅
 **As a** user, **I want** a "Get Ready" countdown then auto-advancing segment timers, **so that** I can follow my routine hands-free.
 
 **Acceptance criteria:**
@@ -273,7 +273,7 @@ Stack (from Planner):
 
 ## Epic 5: Completion
 
-### Story 5.1 — Build completion screen
+### Story 5.1 — Build completion screen ✅
 **As a** user, **I want** a celebration screen after finishing, **so that** I feel accomplished.
 
 **Acceptance criteria:**
