@@ -16,10 +16,13 @@ type Segment = {
   type: 'activity' | 'pause';
 };
 
+type DayOfWeek = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+
 type Habit = {
   id: string;
   name: string;
   segments: Segment[];
+  scheduledDays: DayOfWeek[];
   createdAt: number;
   updatedAt: number;
 };
@@ -60,7 +63,8 @@ Stack (from Planner):
 **As a** developer, **I want** TypeScript types for habits, segments, and session records, **so that** the entire app has a single source of truth.
 
 **Acceptance criteria:**
-- `Habit`, `Segment`, `SessionRecord` types in `src/types/habit.ts`
+- `Habit`, `Segment`, `SessionRecord`, `DayOfWeek` types in `src/types/habit.ts`
+- `Habit` includes `scheduledDays: DayOfWeek[]` for which days the habit should appear
 - Named exports, no `any`
 - IDs are strings
 
@@ -114,6 +118,7 @@ Stack (from Planner):
 - Shows habit name (subtitle style)
 - Shows total duration formatted as "Xm Ys"
 - Shows segment count ("4 segments")
+- Shows scheduled days (e.g., "Mon, Wed, Fri" or "Every day")
 - Pressable with opacity feedback
 - Uses `ThemedView` (`backgroundElement`), rounded corners, `Spacing` constants
 
@@ -126,8 +131,8 @@ Stack (from Planner):
 
 **Acceptance criteria:**
 - Title at top ("Today" or app name)
-- `FlatList` of `HabitCard` components
-- Empty state: "No habits yet — create one in the Planner"
+- `FlatList` of `HabitCard` components, **filtered to only show habits scheduled for today's day of week**
+- Empty state: "No habits for today" with a prompt to go to the Planner
 - Tapping a card navigates to `/session/[id]`
 - Refreshes on tab focus (for after creating habits in planner)
 
@@ -191,12 +196,15 @@ Stack (from Planner):
 
 **Acceptance criteria:**
 - Text input for habit name (required)
+- Day-of-week selector: row of 7 day buttons (Mon–Sun), tap to toggle on/off
+- At least one day must be selected
+- Defaults to all 7 days selected
 - "Add Segment" button → appends default segment (30s, activity type)
 - Each segment: editable name, duration input, activity/pause toggle
 - Segments deletable (min 1 required)
 - Save button persists and navigates back
 - Edit mode: pre-populates, shows delete habit option
-- Validation: name required, at least 1 segment with a name
+- Validation: name required, at least 1 day selected, at least 1 segment with a name
 
 **Files:** `src/components/habit-form.tsx` (new), `src/app/planner/new.tsx` (new), `src/app/planner/[id].tsx` (new)
 
