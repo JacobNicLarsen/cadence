@@ -1,8 +1,7 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback } from 'react';
-import { FlatList, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { FlatList, Pressable, View } from 'react-native';
 import Animated, {
   FadeIn,
   interpolate,
@@ -41,16 +40,13 @@ export default function PlannerListScreen() {
           <Text className="text-3xl font-bold" style={{ fontFamily: 'ui-rounded' }}>
             Planner
           </Text>
-          <GestureDetector
-            gesture={Gesture.Tap()
-              .onEnd(() => router.push('/planner/new'))
-              .runOnJS(true)}>
+          <Pressable onPress={() => router.push('/planner/new')}>
             <View
               className="h-11 w-11 items-center justify-center rounded-full shadow-sm shadow-black/5"
               style={{ backgroundColor: colors.accent }}>
               <SymbolView name="plus" size={18} tintColor="#ffffff" />
             </View>
-          </GestureDetector>
+          </Pressable>
         </View>
         <FlatList
           data={habits}
@@ -71,16 +67,13 @@ export default function PlannerListScreen() {
                 <Text className="text-center text-muted-foreground">
                   Create your first habit to get started.
                 </Text>
-                <GestureDetector
-                  gesture={Gesture.Tap()
-                    .onEnd(() => router.push('/planner/new'))
-                    .runOnJS(true)}>
+                <Pressable onPress={() => router.push('/planner/new')}>
                   <View
                     className="rounded-md px-8 py-4 shadow-sm shadow-black/5"
                     style={{ backgroundColor: colors.accent }}>
                     <Text className="text-base font-semibold text-white">Create Habit</Text>
                   </View>
-                </GestureDetector>
+                </Pressable>
               </View>
             )
           }
@@ -101,18 +94,6 @@ const PlannerRow = ({
 }) => {
   const pressed = useSharedValue(0);
 
-  const tap = Gesture.Tap()
-    .onBegin(() => {
-      pressed.value = withTiming(1, { duration: 100 });
-    })
-    .onFinalize(() => {
-      pressed.value = withTiming(0, { duration: 200 });
-    })
-    .onEnd(() => {
-      onPress();
-    })
-    .runOnJS(true);
-
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: interpolate(pressed.value, [0, 1], [1, 0.97]) }],
     opacity: interpolate(pressed.value, [0, 1], [1, 0.9]),
@@ -120,7 +101,14 @@ const PlannerRow = ({
 
   return (
     <Animated.View entering={FadeIn.delay(index * 80).duration(300)}>
-      <GestureDetector gesture={tap}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={() => {
+          pressed.value = withTiming(1, { duration: 100 });
+        }}
+        onPressOut={() => {
+          pressed.value = withTiming(0, { duration: 200 });
+        }}>
         <Animated.View style={animatedStyle}>
           <View className="gap-1 rounded-xl bg-card p-4 shadow-sm shadow-black/5">
             <Text className="text-xl font-semibold">{habit.name}</Text>
@@ -137,7 +125,7 @@ const PlannerRow = ({
             </View>
           </View>
         </Animated.View>
-      </GestureDetector>
+      </Pressable>
     </Animated.View>
   );
 };

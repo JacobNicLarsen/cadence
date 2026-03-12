@@ -2,8 +2,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
 import Animated, {
   FadeIn,
   SlideInRight,
@@ -252,29 +251,24 @@ const StopButton = ({ onPress }: { onPress: () => void }) => {
   const colors = useThemeColors();
   const pressed = useSharedValue(0);
 
-  const tap = Gesture.Tap()
-    .onBegin(() => {
-      pressed.value = withTiming(1, { duration: 60 });
-    })
-    .onFinalize(() => {
-      pressed.value = withTiming(0, { duration: 150 });
-    })
-    .onEnd(() => {
-      onPress();
-    })
-    .runOnJS(true);
-
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: interpolate(pressed.value, [0, 1], [1, 0.85]) }],
     opacity: interpolate(pressed.value, [0, 1], [1, 0.6]),
   }));
 
   return (
-    <GestureDetector gesture={tap}>
+    <Pressable
+      onPress={onPress}
+      onPressIn={() => {
+        pressed.value = withTiming(1, { duration: 60 });
+      }}
+      onPressOut={() => {
+        pressed.value = withTiming(0, { duration: 150 });
+      }}>
       <Animated.View style={animatedStyle} className="p-2">
         <SymbolView name="xmark.circle.fill" size={28} tintColor={colors.mutedForeground} />
       </Animated.View>
-    </GestureDetector>
+    </Pressable>
   );
 };
 
@@ -288,25 +282,20 @@ const PauseResumeButton = ({
   const colors = useThemeColors();
   const pressed = useSharedValue(0);
 
-  const tap = Gesture.Tap()
-    .onBegin(() => {
-      pressed.value = withTiming(1, { duration: 80 });
-    })
-    .onFinalize(() => {
-      pressed.value = withTiming(0, { duration: 200 });
-    })
-    .onEnd(() => {
-      onPress();
-    })
-    .runOnJS(true);
-
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: interpolate(pressed.value, [0, 1], [1, 0.95]) }],
     opacity: interpolate(pressed.value, [0, 1], [1, 0.9]),
   }));
 
   return (
-    <GestureDetector gesture={tap}>
+    <Pressable
+      onPress={onPress}
+      onPressIn={() => {
+        pressed.value = withTiming(1, { duration: 80 });
+      }}
+      onPressOut={() => {
+        pressed.value = withTiming(0, { duration: 200 });
+      }}>
       <Animated.View
         style={[animatedStyle, { backgroundColor: colors.card }]}
         className="flex-row items-center gap-2 rounded-full px-6 py-2">
@@ -317,6 +306,6 @@ const PauseResumeButton = ({
         />
         <Text className="text-sm font-semibold">{isRunning ? 'Pause' : 'Resume'}</Text>
       </Animated.View>
-    </GestureDetector>
+    </Pressable>
   );
 };

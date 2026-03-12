@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, ScrollView, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   interpolate,
@@ -63,7 +63,19 @@ export const HabitForm = ({
     updateSegment(index, { type: current === 'activity' ? 'pause' : 'activity' });
   };
 
-  const canSave = name.trim().length > 0 && segments.some((s) => s.name.trim().length > 0);
+  const [attempted, setAttempted] = useState(false);
+
+  const missingName = name.trim().length === 0;
+  const missingSegmentName = !segments.some((s) => s.name.trim().length > 0);
+  const canSave = !missingName && !missingSegmentName;
+
+  const handleSavePress = () => {
+    if (!canSave) {
+      setAttempted(true);
+      return;
+    }
+    onSave();
+  };
 
   const handleDelete = () => {
     Alert.alert('Delete Habit', 'Are you sure you want to delete this habit?', [
@@ -73,7 +85,7 @@ export const HabitForm = ({
   };
 
   return (
-    <ScrollView className="flex-1" contentContainerClassName="gap-6 p-6 pb-16">
+    <ScrollView className="flex-1" contentContainerClassName="gap-6 p-6 pb-16" keyboardShouldPersistTaps="handled">
       <View className="gap-2">
         <Text className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           Habit Name
@@ -115,15 +127,31 @@ export const HabitForm = ({
         </GestureDetector>
       </View>
 
-      <SpringButton
-        onPress={onSave}
-        disabled={!canSave}
-        bgColor={colors.accent}
-        disabledOpacity={!canSave}>
-        <Text className="text-base font-semibold text-white">
-          {isEdit ? 'Save Changes' : 'Create Habit'}
-        </Text>
-      </SpringButton>
+      <View className="gap-2">
+        <SpringButton
+          onPress={handleSavePress}
+          bgColor={canSave ? colors.accent : colors.muted}>
+          <Text
+            className="text-base font-semibold"
+            style={{ color: canSave ? '#ffffff' : colors.mutedForeground }}>
+            {isEdit ? 'Save Changes' : 'Create Habit'}
+          </Text>
+        </SpringButton>
+        {attempted && !canSave ? (
+          <View className="gap-1">
+            {missingName ? (
+              <Text className="text-center text-sm text-destructive">
+                Give your habit a name
+              </Text>
+            ) : null}
+            {missingSegmentName ? (
+              <Text className="text-center text-sm text-destructive">
+                Name at least one segment
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+      </View>
 
       {isEdit && onDelete ? (
         <SpringButton onPress={handleDelete} bgColor="transparent">
@@ -243,31 +271,14 @@ const SegmentCard = ({
 
 const SpringButton = ({
   onPress,
-  disabled,
   bgColor,
-  disabledOpacity,
   children,
 }: {
   onPress: () => void;
-  disabled?: boolean;
   bgColor: string;
-  disabledOpacity?: boolean;
   children: React.ReactNode;
 }) => {
   const pressed = useSharedValue(0);
-
-  const tap = Gesture.Tap()
-    .enabled(!disabled)
-    .onBegin(() => {
-      pressed.value = withTiming(1, { duration: 80 });
-    })
-    .onFinalize(() => {
-      pressed.value = withTiming(0, { duration: 200 });
-    })
-    .onEnd(() => {
-      onPress();
-    })
-    .runOnJS(true);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: interpolate(pressed.value, [0, 1], [1, 0.97]) }],
@@ -275,12 +286,19 @@ const SpringButton = ({
   }));
 
   return (
-    <GestureDetector gesture={tap}>
+    <Pressable
+      onPress={onPress}
+      onPressIn={() => {
+        pressed.value = withTiming(1, { duration: 80 });
+      }}
+      onPressOut={() => {
+        pressed.value = withTiming(0, { duration: 200 });
+      }}>
       <Animated.View
         style={[animatedStyle, { backgroundColor: bgColor }]}
-        className={`items-center rounded-md py-4 shadow-sm shadow-black/5 ${disabledOpacity ? 'opacity-50' : ''}`}>
+        className="items-center rounded-md py-4 shadow-sm shadow-black/5">
         {children}
       </Animated.View>
-    </GestureDetector>
+    </Pressable>
   );
 };

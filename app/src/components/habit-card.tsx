@@ -1,5 +1,4 @@
-import { View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Pressable, View } from 'react-native';
 import Animated, {
   FadeIn,
   interpolate,
@@ -29,18 +28,6 @@ export const HabitCard = ({ habit, onPress, index = 0 }: HabitCardProps) => {
   const isActivityHeavy = activityCount >= habit.segments.length / 2;
   const borderColor = isActivityHeavy ? colors.accent : colors.pause;
 
-  const tap = Gesture.Tap()
-    .onBegin(() => {
-      pressed.value = withTiming(1, { duration: 100 });
-    })
-    .onFinalize(() => {
-      pressed.value = withTiming(0, { duration: 200 });
-    })
-    .onEnd(() => {
-      onPress();
-    })
-    .runOnJS(true);
-
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: interpolate(pressed.value, [0, 1], [1, 0.97]) }],
     opacity: interpolate(pressed.value, [0, 1], [1, 0.9]),
@@ -48,7 +35,14 @@ export const HabitCard = ({ habit, onPress, index = 0 }: HabitCardProps) => {
 
   return (
     <Animated.View entering={FadeIn.delay(index * 80).duration(300)}>
-      <GestureDetector gesture={tap}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={() => {
+          pressed.value = withTiming(1, { duration: 100 });
+        }}
+        onPressOut={() => {
+          pressed.value = withTiming(0, { duration: 200 });
+        }}>
         <Animated.View style={animatedStyle}>
           <View
             className="gap-1 rounded-xl bg-card p-4 shadow-sm shadow-black/5"
@@ -65,7 +59,7 @@ export const HabitCard = ({ habit, onPress, index = 0 }: HabitCardProps) => {
             </Text>
           </View>
         </Animated.View>
-      </GestureDetector>
+      </Pressable>
     </Animated.View>
   );
 };

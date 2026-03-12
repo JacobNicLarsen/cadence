@@ -8,6 +8,7 @@ type UseTimerOptions = {
 export const useTimer = ({ duration, onComplete }: UseTimerOptions) => {
   const [remaining, setRemaining] = useState(duration);
   const [isRunning, setIsRunning] = useState(false);
+  const [epoch, setEpoch] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onCompleteRef = useRef(onComplete);
 
@@ -22,6 +23,7 @@ export const useTimer = ({ duration, onComplete }: UseTimerOptions) => {
 
   const start = useCallback(() => {
     setIsRunning(true);
+    setEpoch((e) => e + 1);
   }, []);
 
   const pause = useCallback(() => {
@@ -57,7 +59,7 @@ export const useTimer = ({ duration, onComplete }: UseTimerOptions) => {
     }, 1000);
 
     return clear;
-  }, [isRunning]);
+  }, [isRunning, epoch]);
 
   useEffect(() => {
     return clear;
