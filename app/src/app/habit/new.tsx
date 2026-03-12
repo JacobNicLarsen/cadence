@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
+import { type SFSymbol, SymbolView } from 'expo-symbols';
 import { useRef, useState } from 'react';
 import {
   Alert,
   Keyboard,
   KeyboardAvoidingView,
+  LayoutAnimation,
   Platform,
   Pressable,
   ScrollView,
@@ -13,12 +14,15 @@ import {
   View,
 } from 'react-native';
 import Animated, {
+  Easing,
   FadeIn,
   FadeInDown,
   FadeInRight,
+  LinearTransition,
   interpolate,
   useAnimatedStyle,
   useSharedValue,
+  withSequence,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
@@ -36,16 +40,20 @@ const STEPS = ['Name', 'Schedule', 'Segments'] as const;
 const MIN_SECONDS = 5;
 const MAX_SECONDS = 3600;
 
+const SPRING_CONFIG = { damping: 20, stiffness: 200 };
+
 export default function NewHabitScreen() {
   const router = useRouter();
   const colors = useThemeColors();
 
   const [step, setStep] = useState(0);
+  const [direction, setDirection] = useState<'forward' | 'back'>('forward');
   const [name, setName] = useState('');
   const [scheduledDays, setScheduledDays] = useState<DayOfWeek[]>(ALL_DAYS);
   const [segments, setSegments] = useState<Segment[]>([
     { id: generateId(), name: '', durationSeconds: 60, type: 'activity' },
   ]);
+  const [saving, setSaving] = useState(false);
 
   const nameInputRef = useRef<TextInput>(null);
 
@@ -55,6 +63,7 @@ export default function NewHabitScreen() {
       Alert.alert('Name your segments', 'Give at least one segment a name before saving.');
       return;
     }
+    setSaving(true);
     const now = Date.now();
     await saveHabit({
       id: generateId(),
@@ -77,6 +86,7 @@ export default function NewHabitScreen() {
     Keyboard.dismiss();
     if (!canAdvance()) return;
     if (step < STEPS.length - 1) {
+      setDirection('forward');
       setStep(step + 1);
     } else {
       handleSave();
@@ -85,6 +95,7 @@ export default function NewHabitScreen() {
 
   const handleBack = () => {
     if (step > 0) {
+      setDirection('back');
       setStep(step - 1);
     } else {
       router.back();
@@ -99,7 +110,7 @@ export default function NewHabitScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={10}>
           {/* Top bar */}
-          <View style={styles.topBar}>
+          <Animated.View style={styles.topBar} layout={LinearTransition.springify()}>
             <Pressable onPress={handleBack} hitSlop={12} style={styles.backButton}>
               <SymbolView
                 name={step === 0 ? 'xmark' : 'chevron.left'}
@@ -109,29 +120,35 @@ export default function NewHabitScreen() {
             </Pressable>
             <ProgressDots current={step} total={STEPS.length} colors={colors} />
             <View style={styles.backButton} />
-          </View>
+          </Animated.View>
 
           {/* Step content */}
           <View style={styles.content}>
             {step === 0 ? (
               <StepName
+                key="step-name"
                 name={name}
                 onNameChange={setName}
                 inputRef={nameInputRef}
                 colors={colors}
                 onSubmit={handleNext}
+                direction={direction}
               />
             ) : step === 1 ? (
               <StepSchedule
+                key="step-schedule"
                 scheduledDays={scheduledDays}
                 onScheduledDaysChange={setScheduledDays}
                 colors={colors}
+                direction={direction}
               />
             ) : (
               <StepSegments
+                key="step-segments"
                 segments={segments}
                 onSegmentsChange={setSegments}
                 colors={colors}
+                direction={direction}
               />
             )}
           </View>
@@ -140,7 +157,8 @@ export default function NewHabitScreen() {
           <View style={styles.bottomBar}>
             <ActionButton
               label={step === STEPS.length - 1 ? 'Create Habit' : 'Continue'}
-              enabled={canAdvance()}
+              icon={step === STEPS.length - 1 ? 'checkmark' : 'arrow.right'}
+              enabled={canAdvance() && !saving}
               onPress={handleNext}
               colors={colors}
             />
@@ -153,6 +171,8 @@ export default function NewHabitScreen() {
 
 /* ── Progress Dots ── */
 
+const AnimatedDot = Animated.createAnimatedComponent(View);
+
 const ProgressDots = ({
   current,
   total,
@@ -163,20 +183,47 @@ const ProgressDots = ({
   colors: ReturnType<typeof useThemeColors>;
 }) => (
   <View style={styles.dotsRow}>
-    {Array.from({ length: total }).map((_, i) => (
-      <View
-        key={i}
-        style={[
-          styles.dot,
-          {
-            backgroundColor: i <= current ? colors.accent : colors.border,
-            width: i === current ? 24 : 8,
-          },
-        ]}
-      />
-    ))}
+    {Array.from({ length: total }).map((_, i) => {
+      const isActive = i <= current;
+      const isCurrent = i === current;
+      return (
+        <Animated.View
+          key={i}
+          layout={LinearTransition.springify().damping(18).stiffness(180)}
+          style={[
+            styles.dot,
+            {
+              backgroundColor: isActive ? colors.accent : colors.border,
+              width: isCurrent ? 24 : 8,
+            },
+          ]}
+        />
+      );
+    })}
   </View>
 );
+
+/* ── Staggered Entry Helper ── */
+
+const StaggerChild = ({
+  index,
+  direction,
+  children,
+}: {
+  index: number;
+  direction: 'forward' | 'back';
+  children: React.ReactNode;
+}) => {
+  const enterFrom = direction === 'forward' ? FadeInRight : FadeInRight; // always slide in from appropriate side
+  return (
+    <Animated.View
+      entering={FadeInDown.delay(index * 60)
+        .duration(350)
+        .easing(Easing.out(Easing.cubic))}>
+      {children}
+    </Animated.View>
+  );
+};
 
 /* ── Step 1: Name ── */
 
@@ -186,61 +233,106 @@ const StepName = ({
   inputRef,
   colors,
   onSubmit,
+  direction,
 }: {
   name: string;
   onNameChange: (n: string) => void;
   inputRef: React.RefObject<TextInput | null>;
   colors: ReturnType<typeof useThemeColors>;
   onSubmit: () => void;
+  direction: 'forward' | 'back';
 }) => (
-  <Animated.View entering={FadeInRight.duration(300)} style={styles.stepContainer}>
-    <View style={styles.stepHeader}>
-      <Text style={[styles.stepTitle, { fontFamily: 'ui-rounded' }]}>
-        What habit are you building?
-      </Text>
-      <Text style={[styles.stepSubtitle, { color: colors.mutedForeground }]}>
-        Keep it short and specific
-      </Text>
-    </View>
-    <View
-      style={[
-        styles.nameInputContainer,
-        {
-          borderColor: name.trim().length > 0 ? colors.accent : colors.border,
-          backgroundColor: colors.card,
-        },
-      ]}>
-      <TextInput
-        ref={inputRef}
-        value={name}
-        onChangeText={onNameChange}
-        placeholder="e.g. Morning Yoga"
-        placeholderTextColor={colors.mutedForeground + '80'}
-        style={[styles.nameInput, { color: colors.foreground }]}
-        autoFocus
-        returnKeyType="next"
-        onSubmitEditing={onSubmit}
-        maxLength={50}
-      />
-      {name.trim().length > 0 ? (
-        <Animated.View entering={FadeIn.duration(200)}>
-          <SymbolView name="checkmark.circle.fill" size={22} tintColor={colors.accent} />
-        </Animated.View>
-      ) : null}
-    </View>
+  <Animated.View
+    entering={FadeInRight.duration(350).easing(Easing.out(Easing.cubic))}
+    style={styles.stepContainer}>
+    <StaggerChild index={0} direction={direction}>
+      <View style={styles.stepHeader}>
+        <Text style={[styles.stepTitle, { fontFamily: 'ui-rounded' }]}>
+          What habit are you building?
+        </Text>
+        <Text style={[styles.stepSubtitle, { color: colors.mutedForeground }]}>
+          Keep it short and specific
+        </Text>
+      </View>
+    </StaggerChild>
+
+    <StaggerChild index={1} direction={direction}>
+      <Animated.View
+        style={[
+          styles.nameInputContainer,
+          {
+            borderColor: name.trim().length > 0 ? colors.accent : colors.border,
+            backgroundColor: colors.card,
+          },
+        ]}>
+        <TextInput
+          ref={inputRef}
+          value={name}
+          onChangeText={onNameChange}
+          placeholder="e.g. Morning Yoga"
+          placeholderTextColor={colors.mutedForeground + '80'}
+          style={[styles.nameInput, { color: colors.foreground }]}
+          autoFocus
+          returnKeyType="next"
+          onSubmitEditing={onSubmit}
+          maxLength={50}
+        />
+        {name.trim().length > 0 ? (
+          <Animated.View entering={FadeIn.duration(200)}>
+            <SymbolView name="checkmark.circle.fill" size={22} tintColor={colors.accent} />
+          </Animated.View>
+        ) : null}
+      </Animated.View>
+    </StaggerChild>
+
     <View style={styles.suggestions}>
-      {['Morning Routine', 'Focus Session', 'Workout', 'Meditation'].map((suggestion) => (
-        <Pressable key={suggestion} onPress={() => onNameChange(suggestion)}>
-          <View style={[styles.suggestionChip, { backgroundColor: colors.accent + '12' }]}>
-            <Text style={[styles.suggestionText, { color: colors.accent }]}>
-              {suggestion}
-            </Text>
-          </View>
-        </Pressable>
+      {['Morning Routine', 'Focus Session', 'Workout', 'Meditation'].map((suggestion, i) => (
+        <StaggerChild key={suggestion} index={i + 2} direction={direction}>
+          <SuggestionChip
+            label={suggestion}
+            onPress={() => onNameChange(suggestion)}
+            colors={colors}
+          />
+        </StaggerChild>
       ))}
     </View>
   </Animated.View>
 );
+
+/* ── Suggestion Chip ── */
+
+const SuggestionChip = ({
+  label,
+  onPress,
+  colors,
+}: {
+  label: string;
+  onPress: () => void;
+  colors: ReturnType<typeof useThemeColors>;
+}) => {
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={() => {
+        scale.value = withSpring(0.93, { damping: 15, stiffness: 300 });
+      }}
+      onPressOut={() => {
+        scale.value = withSpring(1, { damping: 12, stiffness: 200 });
+      }}>
+      <Animated.View
+        style={[animatedStyle, styles.suggestionChip, { backgroundColor: colors.accent + '12' }]}>
+        <Text style={[styles.suggestionText, { color: colors.accent }]}>
+          {label}
+        </Text>
+      </Animated.View>
+    </Pressable>
+  );
+};
 
 /* ── Step 2: Schedule ── */
 
@@ -264,10 +356,12 @@ const StepSchedule = ({
   scheduledDays,
   onScheduledDaysChange,
   colors,
+  direction,
 }: {
   scheduledDays: DayOfWeek[];
   onScheduledDaysChange: (days: DayOfWeek[]) => void;
   colors: ReturnType<typeof useThemeColors>;
+  direction: 'forward' | 'back';
 }) => {
   const toggleDay = (day: DayOfWeek) => {
     if (scheduledDays.includes(day)) {
@@ -286,77 +380,166 @@ const StepSchedule = ({
     days.length === scheduledDays.length && days.every((d) => scheduledDays.includes(d));
 
   return (
-    <Animated.View entering={FadeInRight.duration(300)} style={styles.stepContainer}>
-      <View style={styles.stepHeader}>
-        <Text style={[styles.stepTitle, { fontFamily: 'ui-rounded' }]}>
-          When do you practice?
-        </Text>
-        <Text style={[styles.stepSubtitle, { color: colors.mutedForeground }]}>
-          Pick the days that work for you
-        </Text>
-      </View>
+    <Animated.View
+      entering={FadeInRight.duration(350).easing(Easing.out(Easing.cubic))}
+      style={styles.stepContainer}>
+      <StaggerChild index={0} direction={direction}>
+        <View style={styles.stepHeader}>
+          <Text style={[styles.stepTitle, { fontFamily: 'ui-rounded' }]}>
+            When do you practice?
+          </Text>
+          <Text style={[styles.stepSubtitle, { color: colors.mutedForeground }]}>
+            Pick the days that work for you
+          </Text>
+        </View>
+      </StaggerChild>
 
       {/* Quick presets */}
-      <View style={styles.presetsRow}>
-        {PRESETS.map((preset) => {
-          const active = isPresetActive(preset.days);
-          return (
-            <Pressable key={preset.label} onPress={() => applyPreset(preset.days)}>
-              <View
-                style={[
-                  styles.presetChip,
-                  {
-                    backgroundColor: active ? colors.accent : 'transparent',
-                    borderColor: active ? colors.accent : colors.border,
-                  },
-                ]}>
-                <Text
-                  style={[
-                    styles.presetText,
-                    { color: active ? '#ffffff' : colors.mutedForeground },
-                  ]}>
-                  {preset.label}
-                </Text>
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
+      <StaggerChild index={1} direction={direction}>
+        <View style={styles.presetsRow}>
+          {PRESETS.map((preset) => {
+            const active = isPresetActive(preset.days);
+            return (
+              <PresetChip
+                key={preset.label}
+                label={preset.label}
+                active={active}
+                onPress={() => applyPreset(preset.days)}
+                colors={colors}
+              />
+            );
+          })}
+        </View>
+      </StaggerChild>
 
       {/* Day circles */}
       <View style={styles.daysRow}>
-        {DAYS.map(({ key, label, full }) => {
+        {DAYS.map(({ key, label, full }, i) => {
           const selected = scheduledDays.includes(key);
           return (
-            <Pressable key={key} onPress={() => toggleDay(key)}>
-              <View
-                style={[
-                  styles.dayCircle,
-                  {
-                    backgroundColor: selected ? colors.accent : 'transparent',
-                    borderColor: selected ? colors.accent : colors.border,
-                  },
-                ]}>
-                <Text
-                  style={[
-                    styles.dayLabel,
-                    { color: selected ? '#ffffff' : colors.mutedForeground },
-                  ]}>
-                  {label}
-                </Text>
-              </View>
-              <Text
-                style={[
-                  styles.dayFullLabel,
-                  { color: selected ? colors.accent : colors.mutedForeground },
-                ]}>
-                {full}
-              </Text>
-            </Pressable>
+            <StaggerChild key={key} index={i + 2} direction={direction}>
+              <DayButton
+                dayKey={key}
+                label={label}
+                full={full}
+                selected={selected}
+                onToggle={toggleDay}
+                colors={colors}
+              />
+            </StaggerChild>
           );
         })}
       </View>
     </Animated.View>
+  );
+};
+
+/* ── Preset Chip ── */
+
+const PresetChip = ({
+  label,
+  active,
+  onPress,
+  colors,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  colors: ReturnType<typeof useThemeColors>;
+}) => {
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={() => {
+        scale.value = withSpring(0.93, SPRING_CONFIG);
+      }}
+      onPressOut={() => {
+        scale.value = withSpring(1, SPRING_CONFIG);
+      }}>
+      <Animated.View
+        style={[
+          animatedStyle,
+          styles.presetChip,
+          {
+            backgroundColor: active ? colors.accent : 'transparent',
+            borderColor: active ? colors.accent : colors.border,
+          },
+        ]}>
+        <Text
+          style={[
+            styles.presetText,
+            { color: active ? '#ffffff' : colors.mutedForeground },
+          ]}>
+          {label}
+        </Text>
+      </Animated.View>
+    </Pressable>
+  );
+};
+
+/* ── Day Button ── */
+
+const DayButton = ({
+  dayKey,
+  label,
+  full,
+  selected,
+  onToggle,
+  colors,
+}: {
+  dayKey: DayOfWeek;
+  label: string;
+  full: string;
+  selected: boolean;
+  onToggle: (day: DayOfWeek) => void;
+  colors: ReturnType<typeof useThemeColors>;
+}) => {
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const handlePress = () => {
+    scale.value = withSequence(
+      withSpring(0.85, { damping: 15, stiffness: 400 }),
+      withSpring(1, { damping: 10, stiffness: 200 }),
+    );
+    onToggle(dayKey);
+  };
+
+  return (
+    <Pressable onPress={handlePress}>
+      <Animated.View style={[animatedStyle, { alignItems: 'center' }]}>
+        <View
+          style={[
+            styles.dayCircle,
+            {
+              backgroundColor: selected ? colors.accent : 'transparent',
+              borderColor: selected ? colors.accent : colors.border,
+            },
+          ]}>
+          <Text
+            style={[
+              styles.dayLabel,
+              { color: selected ? '#ffffff' : colors.mutedForeground },
+            ]}>
+            {label}
+          </Text>
+        </View>
+        <Text
+          style={[
+            styles.dayFullLabel,
+            { color: selected ? colors.accent : colors.mutedForeground },
+          ]}>
+          {full}
+        </Text>
+      </Animated.View>
+    </Pressable>
   );
 };
 
@@ -366,12 +549,15 @@ const StepSegments = ({
   segments,
   onSegmentsChange,
   colors,
+  direction,
 }: {
   segments: Segment[];
   onSegmentsChange: (segments: Segment[]) => void;
   colors: ReturnType<typeof useThemeColors>;
+  direction: 'forward' | 'back';
 }) => {
   const addSegment = (type: 'activity' | 'pause') => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     onSegmentsChange([
       ...segments,
       {
@@ -390,6 +576,7 @@ const StepSegments = ({
 
   const deleteSegment = (index: number) => {
     if (segments.length <= 1) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     onSegmentsChange(segments.filter((_, i) => i !== index));
   };
 
@@ -399,15 +586,19 @@ const StepSegments = ({
   };
 
   return (
-    <Animated.View entering={FadeInRight.duration(300)} style={styles.stepContainer}>
-      <View style={styles.stepHeader}>
-        <Text style={[styles.stepTitle, { fontFamily: 'ui-rounded' }]}>
-          Build your flow
-        </Text>
-        <Text style={[styles.stepSubtitle, { color: colors.mutedForeground }]}>
-          Add activity and rest segments
-        </Text>
-      </View>
+    <Animated.View
+      entering={FadeInRight.duration(350).easing(Easing.out(Easing.cubic))}
+      style={styles.stepContainer}>
+      <StaggerChild index={0} direction={direction}>
+        <View style={styles.stepHeader}>
+          <Text style={[styles.stepTitle, { fontFamily: 'ui-rounded' }]}>
+            Build your flow
+          </Text>
+          <Text style={[styles.stepSubtitle, { color: colors.mutedForeground }]}>
+            Add activity and rest segments
+          </Text>
+        </View>
+      </StaggerChild>
 
       <ScrollView
         style={styles.segmentsList}
@@ -428,24 +619,26 @@ const StepSegments = ({
         ))}
 
         {/* Add segment buttons */}
-        <View style={styles.addButtons}>
-          <Pressable onPress={() => addSegment('activity')} style={styles.addButtonFlex}>
-            <View style={[styles.addSegmentButton, { borderColor: colors.activity + '40' }]}>
-              <SymbolView name="plus" size={14} tintColor={colors.activity} />
-              <Text style={[styles.addSegmentText, { color: colors.activity }]}>
-                Activity
-              </Text>
-            </View>
-          </Pressable>
-          <Pressable onPress={() => addSegment('pause')} style={styles.addButtonFlex}>
-            <View style={[styles.addSegmentButton, { borderColor: colors.pause + '40' }]}>
-              <SymbolView name="plus" size={14} tintColor={colors.pause} />
-              <Text style={[styles.addSegmentText, { color: colors.pause }]}>
-                Rest
-              </Text>
-            </View>
-          </Pressable>
-        </View>
+        <StaggerChild index={segments.length + 1} direction={direction}>
+          <View style={styles.addButtons}>
+            <Pressable onPress={() => addSegment('activity')} style={styles.addButtonFlex}>
+              <View style={[styles.addSegmentButton, { borderColor: colors.activity + '40' }]}>
+                <SymbolView name="plus" size={14} tintColor={colors.activity} />
+                <Text style={[styles.addSegmentText, { color: colors.activity }]}>
+                  Activity
+                </Text>
+              </View>
+            </Pressable>
+            <Pressable onPress={() => addSegment('pause')} style={styles.addButtonFlex}>
+              <View style={[styles.addSegmentButton, { borderColor: colors.pause + '40' }]}>
+                <SymbolView name="plus" size={14} tintColor={colors.pause} />
+                <Text style={[styles.addSegmentText, { color: colors.pause }]}>
+                  Rest
+                </Text>
+              </View>
+            </Pressable>
+          </View>
+        </StaggerChild>
       </ScrollView>
     </Animated.View>
   );
@@ -620,11 +813,13 @@ const StepperButton = ({
 
 const ActionButton = ({
   label,
+  icon,
   enabled,
   onPress,
   colors,
 }: {
   label: string;
+  icon: SFSymbol;
   enabled: boolean;
   onPress: () => void;
   colors: ReturnType<typeof useThemeColors>;
@@ -646,6 +841,7 @@ const ActionButton = ({
         pressed.value = withSpring(0, { damping: 12, stiffness: 200 });
       }}>
       <Animated.View
+        layout={LinearTransition.springify().damping(18)}
         style={[
           animatedStyle,
           styles.actionButton,
@@ -659,11 +855,13 @@ const ActionButton = ({
           {label}
         </Text>
         {enabled ? (
-          <SymbolView
-            name="arrow.right"
-            size={16}
-            tintColor="#ffffff"
-          />
+          <Animated.View entering={FadeIn.duration(200)}>
+            <SymbolView
+              name={icon}
+              size={16}
+              tintColor="#ffffff"
+            />
+          </Animated.View>
         ) : null}
       </Animated.View>
     </Pressable>
@@ -704,6 +902,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    overflow: 'hidden',
   },
   stepContainer: {
     flex: 1,

@@ -1,16 +1,20 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
+  Easing,
   FadeIn,
   FadeInDown,
   FadeInUp,
   interpolate,
   useAnimatedStyle,
   useSharedValue,
+  withRepeat,
+  withSequence,
   withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 
 import { HabitCard } from '@/components/habit-card';
@@ -98,7 +102,13 @@ export default function HomeScreen() {
         </Animated.View>
 
         {/* Today's Habits */}
-        {todaysHabits.length > 0 ? (
+        {loading ? (
+          <View style={styles.section}>
+            {[0, 1, 2].map((i) => (
+              <SkeletonCard key={i} index={i} colors={colors} />
+            ))}
+          </View>
+        ) : todaysHabits.length > 0 ? (
           <View style={styles.section}>
             {todaysHabits.map((habit, index) => (
               <HabitCard
@@ -110,7 +120,7 @@ export default function HomeScreen() {
               />
             ))}
           </View>
-        ) : loading ? null : (
+        ) : (
           <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.emptyState}>
             <View style={[styles.emptyIcon, { backgroundColor: colors.muted }]}>
               <SymbolView name="sun.max" size={32} tintColor={colors.mutedForeground} />
@@ -135,6 +145,46 @@ export default function HomeScreen() {
     </View>
   );
 }
+
+const SkeletonCard = ({
+  index,
+  colors,
+}: {
+  index: number;
+  colors: ReturnType<typeof useThemeColors>;
+}) => {
+  const pulse = useSharedValue(0.4);
+
+  useEffect(() => {
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 800, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.4, { duration: 800, easing: Easing.inOut(Easing.ease) }),
+      ),
+      -1,
+    );
+  }, [pulse]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: pulse.value,
+  }));
+
+  return (
+    <Animated.View
+      entering={FadeIn.delay(index * 100).duration(300)}
+      style={[styles.skeletonCard, { backgroundColor: colors.muted }]}>
+      <Animated.View style={animatedStyle}>
+        <View style={styles.skeletonRow}>
+          <View style={[styles.skeletonCircle, { backgroundColor: colors.border }]} />
+          <View style={styles.skeletonLines}>
+            <View style={[styles.skeletonLine, styles.skeletonLineWide, { backgroundColor: colors.border }]} />
+            <View style={[styles.skeletonLine, styles.skeletonLineNarrow, { backgroundColor: colors.border }]} />
+          </View>
+        </View>
+      </Animated.View>
+    </Animated.View>
+  );
+};
 
 const FAB = ({ onPress, color }: { onPress: () => void; color: string }) => {
   const pressed = useSharedValue(0);
@@ -222,6 +272,36 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     fontSize: 15,
     textAlign: 'center',
+  },
+  skeletonCard: {
+    borderRadius: 16,
+    padding: 18,
+    height: 80,
+    justifyContent: 'center',
+  },
+  skeletonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  skeletonCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  skeletonLines: {
+    flex: 1,
+    gap: 8,
+  },
+  skeletonLine: {
+    height: 12,
+    borderRadius: 6,
+  },
+  skeletonLineWide: {
+    width: '70%',
+  },
+  skeletonLineNarrow: {
+    width: '45%',
   },
   fabContainer: {
     position: 'absolute',
