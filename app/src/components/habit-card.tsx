@@ -1,24 +1,26 @@
-import { Pressable, View } from 'react-native';
+import { SymbolView } from 'expo-symbols';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
-  FadeIn,
+  FadeInDown,
   interpolate,
   useAnimatedStyle,
   useSharedValue,
-  withTiming,
+  withSpring,
 } from 'react-native-reanimated';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/colors';
 import type { Habit } from '@/types/habit';
-import { formatDuration, formatScheduledDays, totalDuration } from '@/utils/format';
+import { formatDuration, totalDuration } from '@/utils/format';
 
 type HabitCardProps = {
   habit: Habit;
   onPress: () => void;
+  onEdit?: () => void;
   index?: number;
 };
 
-export const HabitCard = ({ habit, onPress, index = 0 }: HabitCardProps) => {
+export const HabitCard = ({ habit, onPress, onEdit, index = 0 }: HabitCardProps) => {
   const colors = useThemeColors();
   const duration = totalDuration(habit.segments);
   const segmentCount = habit.segments.length;
@@ -26,40 +28,131 @@ export const HabitCard = ({ habit, onPress, index = 0 }: HabitCardProps) => {
 
   const activityCount = habit.segments.filter((s) => s.type === 'activity').length;
   const isActivityHeavy = activityCount >= habit.segments.length / 2;
-  const borderColor = isActivityHeavy ? colors.accent : colors.pause;
+  const accentColor = isActivityHeavy ? colors.activity : colors.pause;
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: interpolate(pressed.value, [0, 1], [1, 0.97]) }],
-    opacity: interpolate(pressed.value, [0, 1], [1, 0.9]),
   }));
 
   return (
-    <Animated.View entering={FadeIn.delay(index * 80).duration(300)}>
+    <Animated.View entering={FadeInDown.delay(index * 80).duration(300).springify()}>
       <Pressable
         onPress={onPress}
         onPressIn={() => {
-          pressed.value = withTiming(1, { duration: 100 });
+          pressed.value = withSpring(1, { damping: 15, stiffness: 300 });
         }}
         onPressOut={() => {
-          pressed.value = withTiming(0, { duration: 200 });
+          pressed.value = withSpring(0, { damping: 15, stiffness: 200 });
         }}>
         <Animated.View style={animatedStyle}>
-          <View
-            className="gap-1 rounded-xl bg-card p-4 shadow-sm shadow-black/5"
-            style={{ borderLeftWidth: 3, borderLeftColor: borderColor }}>
-            <Text className="text-xl font-semibold">{habit.name}</Text>
-            <View className="flex-row gap-4">
-              <Text className="text-sm text-muted-foreground">{formatDuration(duration)}</Text>
-              <Text className="text-sm text-muted-foreground">
-                {segmentCount} {segmentCount === 1 ? 'segment' : 'segments'}
-              </Text>
+          <View style={[styles.card, { backgroundColor: colors.card }]}>
+            {/* Accent stripe */}
+            <View style={[styles.accentStripe, { backgroundColor: accentColor }]} />
+
+            <View style={styles.cardContent}>
+              {/* Top row: name + edit */}
+              <View style={styles.topRow}>
+                <Text
+                  style={[styles.name, { color: colors.foreground }]}
+                  numberOfLines={1}>
+                  {habit.name}
+                </Text>
+                {onEdit ? (
+                  <Pressable onPress={onEdit} hitSlop={12} style={styles.editButton}>
+                    <SymbolView name="ellipsis" size={16} tintColor={colors.mutedForeground} />
+                  </Pressable>
+                ) : null}
+              </View>
+
+              {/* Meta row */}
+              <View style={styles.metaRow}>
+                <View style={styles.metaPill}>
+                  <SymbolView name="clock" size={12} tintColor={colors.mutedForeground} />
+                  <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
+                    {formatDuration(duration)}
+                  </Text>
+                </View>
+                <View style={styles.metaPill}>
+                  <SymbolView name="square.stack" size={12} tintColor={colors.mutedForeground} />
+                  <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
+                    {segmentCount} {segmentCount === 1 ? 'segment' : 'segments'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Play button */}
+              <View style={styles.bottomRow}>
+                <View style={[styles.playChip, { backgroundColor: accentColor + '15' }]}>
+                  <SymbolView name="play.fill" size={11} tintColor={accentColor} />
+                  <Text style={[styles.playText, { color: accentColor }]}>
+                    Start
+                  </Text>
+                </View>
+              </View>
             </View>
-            <Text className="text-sm text-muted-foreground">
-              {formatScheduledDays(habit.scheduledDays)}
-            </Text>
           </View>
         </Animated.View>
       </Pressable>
     </Animated.View>
   );
 };
+
+const styles = StyleSheet.create({
+  card: {
+    borderRadius: 16,
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
+  accentStripe: {
+    width: 4,
+  },
+  cardContent: {
+    flex: 1,
+    padding: 16,
+    paddingLeft: 14,
+    gap: 10,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  name: {
+    fontSize: 18,
+    fontWeight: '600',
+    flex: 1,
+    letterSpacing: -0.2,
+  },
+  editButton: {
+    padding: 4,
+    marginRight: -4,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  metaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  metaText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  bottomRow: {
+    flexDirection: 'row',
+  },
+  playChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  playText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+});
