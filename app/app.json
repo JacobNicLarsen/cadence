@@ -8,6 +8,7 @@
     "scheme": "cadence",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.cadence",
       "icon": "./assets/expo.icon"
     },
     "android": {
