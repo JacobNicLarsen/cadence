@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
     paddingLeft: 14,
-    gap: 10,
+    gap: 8,
   },
   topRow: {
     flexDirection: 'row',

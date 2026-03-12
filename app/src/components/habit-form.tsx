@@ -1,20 +1,32 @@
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, {
   interpolate,
   useAnimatedStyle,
   useSharedValue,
+  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { SymbolView } from 'expo-symbols';
 
-import { DaySelector } from '@/components/day-selector';
-import { DurationInput } from '@/components/duration-input';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/colors';
 import type { DayOfWeek, Segment } from '@/types/habit';
+import { formatDuration } from '@/utils/format';
 import { generateId } from '@/utils/id';
+
+const DAYS: { key: DayOfWeek; label: string }[] = [
+  { key: 'mon', label: 'M' },
+  { key: 'tue', label: 'T' },
+  { key: 'wed', label: 'W' },
+  { key: 'thu', label: 'T' },
+  { key: 'fri', label: 'F' },
+  { key: 'sat', label: 'S' },
+  { key: 'sun', label: 'S' },
+];
+
+const MIN_SECONDS = 5;
+const MAX_SECONDS = 3600;
 
 type HabitFormProps = {
   name: string;
@@ -44,7 +56,7 @@ export const HabitForm = ({
   const addSegment = () => {
     onSegmentsChange([
       ...segments,
-      { id: generateId(), name: '', durationSeconds: 30, type: 'activity' },
+      { id: generateId(), name: '', durationSeconds: 60, type: 'activity' },
     ]);
   };
 
@@ -61,6 +73,15 @@ export const HabitForm = ({
   const toggleType = (index: number) => {
     const current = segments[index].type;
     updateSegment(index, { type: current === 'activity' ? 'pause' : 'activity' });
+  };
+
+  const toggleDay = (day: DayOfWeek) => {
+    if (scheduledDays.includes(day)) {
+      if (scheduledDays.length <= 1) return;
+      onScheduledDaysChange(scheduledDays.filter((d) => d !== day));
+    } else {
+      onScheduledDaysChange([...scheduledDays, day]);
+    }
   };
 
   const [attempted, setAttempted] = useState(false);
@@ -85,67 +106,116 @@ export const HabitForm = ({
   };
 
   return (
-    <ScrollView className="flex-1" contentContainerClassName="gap-6 p-6 pb-16" keyboardShouldPersistTaps="handled">
-      <View className="gap-2">
-        <Text className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.scrollContent}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}>
+      {/* Name */}
+      <View style={styles.fieldGroup}>
+        <Text style={[styles.label, { color: colors.mutedForeground }]}>
           Habit Name
         </Text>
-        <FocusableInput
-          value={name}
-          onChangeText={onNameChange}
-          placeholder="e.g. Morning Routine"
-        />
+        <View
+          style={[
+            styles.nameInput,
+            {
+              borderColor: name.trim() ? colors.accent : colors.border,
+              backgroundColor: colors.card,
+            },
+          ]}>
+          <TextInput
+            value={name}
+            onChangeText={onNameChange}
+            placeholder="e.g. Morning Routine"
+            placeholderTextColor={colors.mutedForeground + '80'}
+            style={[styles.nameInputText, { color: colors.foreground }]}
+            maxLength={50}
+          />
+          {name.trim().length > 0 ? (
+            <SymbolView name="checkmark.circle.fill" size={20} tintColor={colors.accent} />
+          ) : null}
+        </View>
       </View>
 
-      <View className="gap-2">
-        <Text className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+      {/* Schedule */}
+      <View style={styles.fieldGroup}>
+        <Text style={[styles.label, { color: colors.mutedForeground }]}>
           Schedule
         </Text>
-        <DaySelector selected={scheduledDays} onChange={onScheduledDaysChange} />
+        <View style={styles.daysRow}>
+          {DAYS.map(({ key, label }) => {
+            const selected = scheduledDays.includes(key);
+            return (
+              <Pressable key={key} onPress={() => toggleDay(key)}>
+                <View
+                  style={[
+                    styles.dayCircle,
+                    {
+                      backgroundColor: selected ? colors.accent : 'transparent',
+                      borderColor: selected ? colors.accent : colors.border,
+                    },
+                  ]}>
+                  <Text
+                    style={[
+                      styles.dayLabel,
+                      { color: selected ? '#ffffff' : colors.mutedForeground },
+                    ]}>
+                    {label}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
-      <View className="gap-2">
-        <Text className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+      {/* Segments */}
+      <View style={styles.fieldGroup}>
+        <Text style={[styles.label, { color: colors.mutedForeground }]}>
           Segments
         </Text>
-        {segments.map((segment, index) => (
-          <SegmentCard
-            key={segment.id}
-            segment={segment}
-            index={index}
-            total={segments.length}
-            onUpdate={(updates) => updateSegment(index, updates)}
-            onDelete={() => deleteSegment(index)}
-            onToggleType={() => toggleType(index)}
-          />
-        ))}
-        <GestureDetector gesture={Gesture.Tap().onEnd(addSegment).runOnJS(true)}>
-          <View className="flex-row items-center justify-center gap-2 rounded-xl border border-dashed border-border py-4">
-            <SymbolView name="plus" size={16} tintColor={colors.mutedForeground} />
-            <Text className="text-sm text-muted-foreground">Add Segment</Text>
-          </View>
-        </GestureDetector>
+        <View style={styles.segmentsGap}>
+          {segments.map((segment, index) => (
+            <SegmentCard
+              key={segment.id}
+              segment={segment}
+              total={segments.length}
+              onUpdate={(updates) => updateSegment(index, updates)}
+              onDelete={() => deleteSegment(index)}
+              onToggleType={() => toggleType(index)}
+              colors={colors}
+            />
+          ))}
+          <Pressable onPress={addSegment}>
+            <View style={[styles.addButton, { borderColor: colors.border }]}>
+              <SymbolView name="plus" size={14} tintColor={colors.mutedForeground} />
+              <Text style={[styles.addButtonText, { color: colors.mutedForeground }]}>
+                Add Segment
+              </Text>
+            </View>
+          </Pressable>
+        </View>
       </View>
 
-      <View className="gap-2">
-        <SpringButton
+      {/* Save */}
+      <View style={styles.actions}>
+        <ActionButton
+          label={isEdit ? 'Save Changes' : 'Create Habit'}
+          enabled={canSave}
           onPress={handleSavePress}
-          bgColor={canSave ? colors.accent : colors.muted}>
-          <Text
-            className="text-base font-semibold"
-            style={{ color: canSave ? '#ffffff' : colors.mutedForeground }}>
-            {isEdit ? 'Save Changes' : 'Create Habit'}
-          </Text>
-        </SpringButton>
+          bgColor={canSave ? colors.accent : colors.muted}
+          textColor={canSave ? '#ffffff' : colors.mutedForeground}
+        />
         {attempted && !canSave ? (
-          <View className="gap-1">
+          <View style={styles.errorGroup}>
             {missingName ? (
-              <Text className="text-center text-sm text-destructive">
+              <Text style={[styles.errorText, { color: colors.destructive }]}>
                 Give your habit a name
               </Text>
             ) : null}
             {missingSegmentName ? (
-              <Text className="text-center text-sm text-destructive">
+              <Text style={[styles.errorText, { color: colors.destructive }]}>
                 Name at least one segment
               </Text>
             ) : null}
@@ -153,152 +223,416 @@ export const HabitForm = ({
         ) : null}
       </View>
 
+      {/* Delete */}
       {isEdit && onDelete ? (
-        <SpringButton onPress={handleDelete} bgColor="transparent">
-          <Text className="text-sm text-destructive">Delete Habit</Text>
-        </SpringButton>
+        <Pressable onPress={handleDelete} style={styles.deleteRow}>
+          <SymbolView name="trash" size={14} tintColor={colors.destructive} />
+          <Text style={[styles.deleteText, { color: colors.destructive }]}>
+            Delete Habit
+          </Text>
+        </Pressable>
       ) : null}
     </ScrollView>
   );
 };
 
-const FocusableInput = ({
-  value,
-  onChangeText,
-  placeholder,
-}: {
-  value: string;
-  onChangeText: (text: string) => void;
-  placeholder: string;
-}) => {
-  const colors = useThemeColors();
-  const [focused, setFocused] = useState(false);
-
-  return (
-    <TextInput
-      value={value}
-      onChangeText={onChangeText}
-      placeholder={placeholder}
-      placeholderTextColor={colors.mutedForeground}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
-      className="rounded-md border p-4 text-base text-foreground"
-      style={{
-        borderColor: focused ? colors.ring : colors.border,
-      }}
-    />
-  );
-};
+/* ── Segment Card ── */
 
 const SegmentCard = ({
   segment,
-  index,
   total,
   onUpdate,
   onDelete,
   onToggleType,
+  colors,
 }: {
   segment: Segment;
-  index: number;
   total: number;
   onUpdate: (updates: Partial<Segment>) => void;
   onDelete: () => void;
   onToggleType: () => void;
+  colors: ReturnType<typeof useThemeColors>;
 }) => {
-  const colors = useThemeColors();
   const isActivity = segment.type === 'activity';
+  const accentColor = isActivity ? colors.activity : colors.pause;
   const sliderPos = useSharedValue(isActivity ? 0 : 1);
 
   const handleToggle = () => {
-    sliderPos.value = withTiming(isActivity ? 1 : 0, { duration: 200 });
+    sliderPos.value = withTiming(isActivity ? 1 : 0, { duration: 250 });
     onToggleType();
   };
 
   const sliderStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: sliderPos.value * 80 }],
+    transform: [{ translateX: sliderPos.value * 72 }],
   }));
 
+  const clamp = (v: number) => Math.max(MIN_SECONDS, Math.min(MAX_SECONDS, v));
+
   return (
-    <View className="gap-2 rounded-xl bg-card p-4 shadow-sm shadow-black/5">
-      <View className="flex-row items-center gap-2">
-        <TextInput
-          value={segment.name}
-          onChangeText={(text) => onUpdate({ name: text })}
-          placeholder="Segment name"
-          placeholderTextColor={colors.mutedForeground}
-          className="flex-1 text-base font-semibold text-foreground"
-        />
-        {total > 1 ? (
-          <GestureDetector gesture={Gesture.Tap().onEnd(onDelete).runOnJS(true)}>
-            <View className="p-1" hitSlop={8}>
-              <SymbolView name="xmark" size={12} tintColor={colors.mutedForeground} />
+    <View style={[styles.segmentCard, { backgroundColor: accentColor + '08' }]}>
+      <View style={[styles.segmentAccent, { backgroundColor: accentColor }]} />
+      <View style={styles.segmentContent}>
+        {/* Type toggle + delete */}
+        <View style={styles.segmentTopRow}>
+          <Pressable onPress={handleToggle}>
+            <View style={[styles.typeToggle, { backgroundColor: colors.card }]}>
+              <Animated.View
+                style={[
+                  styles.typeSlider,
+                  { backgroundColor: accentColor },
+                  sliderStyle,
+                ]}
+              />
+              <Text
+                style={[
+                  styles.typeLabel,
+                  { color: isActivity ? '#ffffff' : colors.foreground, zIndex: 1 },
+                ]}>
+                Activity
+              </Text>
+              <Text
+                style={[
+                  styles.typeLabel,
+                  { color: isActivity ? colors.foreground : '#ffffff', zIndex: 1 },
+                ]}>
+                Rest
+              </Text>
             </View>
-          </GestureDetector>
-        ) : null}
-      </View>
-      <View className="flex-row items-center justify-between">
-        <GestureDetector gesture={Gesture.Tap().onEnd(handleToggle).runOnJS(true)}>
-          <View
-            className="relative h-9 w-40 flex-row overflow-hidden rounded-md"
-            style={{ backgroundColor: colors.muted }}>
-            <Animated.View
-              className="absolute h-9 w-20 rounded-md"
-              style={[
-                { backgroundColor: isActivity ? colors.accent : colors.pause },
-                sliderStyle,
-              ]}
+          </Pressable>
+          {total > 1 ? (
+            <Pressable onPress={onDelete} hitSlop={12}>
+              <View style={styles.segmentDeleteBtn}>
+                <SymbolView name="trash" size={14} tintColor={colors.destructive} />
+              </View>
+            </Pressable>
+          ) : null}
+        </View>
+
+        {/* Name */}
+        <View
+          style={[
+            styles.segmentNameRow,
+            {
+              borderColor: segment.name.trim() ? accentColor + '50' : colors.border,
+              backgroundColor: colors.card,
+            },
+          ]}>
+          <SymbolView
+            name={isActivity ? 'bolt.fill' : 'leaf.fill'}
+            size={16}
+            tintColor={accentColor}
+          />
+          <TextInput
+            value={segment.name}
+            onChangeText={(text) => onUpdate({ name: text })}
+            placeholder={isActivity ? 'e.g. Work sprint' : 'e.g. Deep breaths'}
+            placeholderTextColor={colors.mutedForeground + '60'}
+            style={[styles.segmentNameInput, { color: colors.foreground }]}
+            maxLength={40}
+          />
+        </View>
+
+        {/* Duration */}
+        <View style={styles.durationRow}>
+          <SymbolView name="clock" size={14} tintColor={colors.mutedForeground} />
+          <Text style={[styles.durationLabel, { color: colors.mutedForeground }]}>
+            Duration
+          </Text>
+          <View style={styles.durationControls}>
+            <StepperButton
+              icon="minus"
+              onPress={() => onUpdate({ durationSeconds: clamp(segment.durationSeconds - 15) })}
+              colors={colors}
             />
-            <Text
-              className="z-10 flex-1 text-center text-sm leading-9"
-              style={{ color: isActivity ? '#ffffff' : colors.foreground }}>
-              Activity
-            </Text>
-            <Text
-              className="z-10 flex-1 text-center text-sm leading-9"
-              style={{ color: isActivity ? colors.foreground : '#ffffff' }}>
-              Pause
-            </Text>
+            <View style={[styles.durationDisplay, { backgroundColor: colors.card }]}>
+              <Text style={[styles.durationText, { color: colors.foreground }]}>
+                {formatDuration(segment.durationSeconds)}
+              </Text>
+            </View>
+            <StepperButton
+              icon="plus"
+              onPress={() => onUpdate({ durationSeconds: clamp(segment.durationSeconds + 15) })}
+              colors={colors}
+            />
           </View>
-        </GestureDetector>
-        <DurationInput
-          value={segment.durationSeconds}
-          onChange={(seconds) => onUpdate({ durationSeconds: seconds })}
-        />
+        </View>
       </View>
     </View>
   );
 };
 
-const SpringButton = ({
+/* ── Stepper Button ── */
+
+const StepperButton = ({
+  icon,
   onPress,
-  bgColor,
-  children,
+  colors,
 }: {
+  icon: 'minus' | 'plus';
   onPress: () => void;
-  bgColor: string;
-  children: React.ReactNode;
+  colors: ReturnType<typeof useThemeColors>;
 }) => {
   const pressed = useSharedValue(0);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: interpolate(pressed.value, [0, 1], [1, 0.97]) }],
-    opacity: interpolate(pressed.value, [0, 1], [1, 0.9]),
+    transform: [{ scale: interpolate(pressed.value, [0, 1], [1, 0.85]) }],
   }));
 
   return (
     <Pressable
       onPress={onPress}
       onPressIn={() => {
-        pressed.value = withTiming(1, { duration: 80 });
+        pressed.value = withTiming(1, { duration: 60 });
       }}
       onPressOut={() => {
-        pressed.value = withTiming(0, { duration: 200 });
+        pressed.value = withTiming(0, { duration: 150 });
       }}>
       <Animated.View
-        style={[animatedStyle, { backgroundColor: bgColor }]}
-        className="items-center rounded-md py-4 shadow-sm shadow-black/5">
-        {children}
+        style={[animatedStyle, styles.stepperBtn, { backgroundColor: colors.muted }]}>
+        <SymbolView name={icon} size={12} tintColor={colors.mutedForeground} />
       </Animated.View>
     </Pressable>
   );
 };
+
+/* ── Action Button ── */
+
+const ActionButton = ({
+  label,
+  enabled,
+  onPress,
+  bgColor,
+  textColor,
+}: {
+  label: string;
+  enabled: boolean;
+  onPress: () => void;
+  bgColor: string;
+  textColor: string;
+}) => {
+  const pressed = useSharedValue(0);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(pressed.value, [0, 1], [1, 0.97]) }],
+  }));
+
+  return (
+    <Pressable
+      onPress={enabled ? onPress : undefined}
+      onPressIn={() => {
+        if (!enabled) return;
+        pressed.value = withSpring(1, { damping: 15, stiffness: 300 });
+      }}
+      onPressOut={() => {
+        pressed.value = withSpring(0, { damping: 12, stiffness: 200 });
+      }}>
+      <Animated.View style={[animatedStyle, styles.saveButton, { backgroundColor: bgColor }]}>
+        <Text style={[styles.saveButtonText, { color: textColor }]}>
+          {label}
+        </Text>
+      </Animated.View>
+    </Pressable>
+  );
+};
+
+/* ── Styles ── */
+
+const styles = StyleSheet.create({
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 24,
+    paddingBottom: 48,
+    gap: 28,
+  },
+
+  // Field groups
+  fieldGroup: {
+    gap: 10,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+
+  // Name input
+  nameInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 10,
+  },
+  nameInputText: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '500',
+  },
+
+  // Days
+  daysRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  dayCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+  },
+  dayLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  // Segments
+  segmentsGap: {
+    gap: 10,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+  },
+  addButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  // Segment card
+  segmentCard: {
+    borderRadius: 14,
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
+  segmentAccent: {
+    width: 4,
+  },
+  segmentContent: {
+    flex: 1,
+    padding: 14,
+    gap: 12,
+  },
+  segmentTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  typeToggle: {
+    flexDirection: 'row',
+    width: 144,
+    height: 34,
+    borderRadius: 10,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  typeSlider: {
+    position: 'absolute',
+    width: 72,
+    height: 34,
+    borderRadius: 10,
+  },
+  typeLabel: {
+    flex: 1,
+    textAlign: 'center',
+    lineHeight: 34,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  segmentDeleteBtn: {
+    padding: 6,
+  },
+  segmentNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 10,
+  },
+  segmentNameInput: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  durationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  durationLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginRight: 'auto',
+  },
+  durationControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  stepperBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  durationDisplay: {
+    minWidth: 60,
+    alignItems: 'center',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  durationText: {
+    fontSize: 15,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+  },
+
+  // Actions
+  actions: {
+    gap: 8,
+  },
+  saveButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 14,
+  },
+  saveButtonText: {
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  errorGroup: {
+    gap: 4,
+  },
+  errorText: {
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  deleteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+  },
+  deleteText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+});

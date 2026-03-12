@@ -683,8 +683,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
   backButton: {
     width: 40,
@@ -917,8 +918,8 @@ const styles = StyleSheet.create({
   // Action button
   bottomBar: {
     paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 8,
+    paddingTop: 12,
+    paddingBottom: 16,
   },
   actionButton: {
     flexDirection: 'row',

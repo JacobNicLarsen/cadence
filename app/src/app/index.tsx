@@ -1,7 +1,8 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -11,7 +12,6 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HabitCard } from '@/components/habit-card';
 import { Text } from '@/components/ui/text';
@@ -46,7 +46,6 @@ export default function HomeScreen() {
   const { habits, loading, refresh } = useHabits();
   const router = useRouter();
   const colors = useThemeColors();
-  const insets = useSafeAreaInsets();
 
   useFocusEffect(
     useCallback(() => {
@@ -74,63 +73,63 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container} className="bg-background">
-      <SafeAreaView style={styles.flex}>
+      <SafeAreaView style={styles.flex} edges={['top', 'left', 'right']}>
         <ScrollView
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 }]}
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}>
-          {/* Header */}
-          <Animated.View entering={FadeIn.duration(400)} style={styles.header}>
-            <View style={styles.headerText}>
-              <Text style={[styles.title, { fontFamily: 'ui-rounded' }]}>
-                Today
-              </Text>
-              <Text style={[styles.date, { color: colors.mutedForeground }]}>
-                {getFormattedDate()}
-              </Text>
-            </View>
-            {habits.length > 0 ? (
-              <Pressable
-                onPress={() => router.push('/habits-list')}
-                hitSlop={8}
-                style={styles.manageButton}>
-                <SymbolView name="list.bullet" size={20} tintColor={colors.foreground} />
-              </Pressable>
-            ) : null}
-          </Animated.View>
+        {/* Header */}
+        <Animated.View entering={FadeIn.duration(400)} style={styles.header}>
+          <View style={styles.headerText}>
+            <Text style={[styles.title, { fontFamily: 'ui-rounded' }]}>
+              Today
+            </Text>
+            <Text style={[styles.date, { color: colors.mutedForeground }]}>
+              {getFormattedDate()}
+            </Text>
+          </View>
+          {habits.length > 0 ? (
+            <Pressable
+              onPress={() => router.push('/habits-list')}
+              hitSlop={8}
+              style={styles.manageButton}>
+              <SymbolView name="list.bullet" size={20} tintColor={colors.foreground} />
+            </Pressable>
+          ) : null}
+        </Animated.View>
 
-          {/* Today's Habits */}
-          {todaysHabits.length > 0 ? (
-            <View style={styles.section}>
-              {todaysHabits.map((habit, index) => (
-                <HabitCard
-                  key={habit.id}
-                  habit={habit}
-                  onPress={() => handleStart(habit)}
-                  onEdit={() => handleEdit(habit)}
-                  index={index}
-                />
-              ))}
+        {/* Today's Habits */}
+        {todaysHabits.length > 0 ? (
+          <View style={styles.section}>
+            {todaysHabits.map((habit, index) => (
+              <HabitCard
+                key={habit.id}
+                habit={habit}
+                onPress={() => handleStart(habit)}
+                onEdit={() => handleEdit(habit)}
+                index={index}
+              />
+            ))}
+          </View>
+        ) : loading ? null : (
+          <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.emptyState}>
+            <View style={[styles.emptyIcon, { backgroundColor: colors.muted }]}>
+              <SymbolView name="sun.max" size={32} tintColor={colors.mutedForeground} />
             </View>
-          ) : loading ? null : (
-            <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.emptyState}>
-              <View style={[styles.emptyIcon, { backgroundColor: colors.muted }]}>
-                <SymbolView name="sun.max" size={32} tintColor={colors.mutedForeground} />
-              </View>
-              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-                Nothing scheduled today
-              </Text>
-              <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>
-                Tap + to create your first habit
-              </Text>
-            </Animated.View>
-          )}
-        </ScrollView>
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+              Nothing scheduled today
+            </Text>
+            <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>
+              Tap + to create your first habit
+            </Text>
+          </Animated.View>
+        )}
+      </ScrollView>
       </SafeAreaView>
 
       {/* FAB */}
       <Animated.View
         entering={FadeInUp.delay(300).duration(400).springify()}
-        style={[styles.fabContainer, { bottom: insets.bottom + 24 }]}>
+        style={styles.fabContainer}>
         <FAB onPress={handleCreate} color={colors.accent} />
       </Animated.View>
     </View>
@@ -191,9 +190,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   manageButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -203,9 +202,9 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     alignItems: 'center',
-    gap: 12,
-    paddingTop: 60,
-    paddingHorizontal: 24,
+    gap: 14,
+    paddingTop: 80,
+    paddingHorizontal: 32,
   },
   emptyIcon: {
     width: 72,
@@ -226,6 +225,7 @@ const styles = StyleSheet.create({
   fabContainer: {
     position: 'absolute',
     right: 24,
+    bottom: Platform.OS === 'ios' ? 48 : 24,
   },
   fab: {
     width: 56,
