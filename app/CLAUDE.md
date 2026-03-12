@@ -61,6 +61,24 @@ Skills live in `.agents/skills/` and are symlinked from `.claude/skills/`. Each 
 - Use `react-native-gesture-handler` for gestures, not `PanResponder`.
 - Avoid inline object/function creation in render for list items (see skills).
 - Boolean short-circuits: use `{count > 0 ? <View /> : null}` not `{count && <View />}`.
+- **Font clipping**: Large bold text (especially with `fontFamily: 'ui-rounded'`) needs explicit `lineHeight` — the default clips ascenders. Rule of thumb: `lineHeight` ≈ `fontSize * 1.2` (e.g. fontSize 34 → lineHeight 41, fontSize 28 → lineHeight 34).
+
+## Animation Patterns
+
+Follow these established patterns for consistent, polished feel:
+
+- **Staggered entry**: Use `FadeInDown.delay(index * 60).duration(350).easing(Easing.out(Easing.cubic))` for lists/groups of elements appearing sequentially.
+- **Press feedback**: Spring scale on `onPressIn`/`onPressOut` — `withSpring(0.93, { damping: 15, stiffness: 300 })` for chips/small elements, `0.97` for buttons, `0.85` for steppers.
+- **Day circle bounce**: `withSequence(withSpring(0.85, fast), withSpring(1, slow))` for toggle interactions that feel physical.
+- **Layout transitions**: Use `LinearTransition.springify().damping(18).stiffness(180)` on progress indicators and elements that change size.
+- **Segment add/delete**: `LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)` for smooth list reflow.
+- **Step transitions**: `FadeInRight.duration(350).easing(Easing.out(Easing.cubic))` for wizard-style forward navigation.
+- **Skeleton loading**: Pulsing opacity (0.4 → 1 repeating, 800ms each direction) with `FadeIn.delay(index * 100)` stagger. Always show skeletons instead of blank screens during loading.
+
+## Simulator Debugging
+
+- Take screenshots: `xcrun simctl io booted screenshot /tmp/screenshot.png` — then read the PNG to visually verify UI.
+- Use this to verify layout fixes, animation states, and visual regressions.
 
 ## Commands
 
