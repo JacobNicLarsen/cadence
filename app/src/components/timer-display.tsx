@@ -1,67 +1,37 @@
-import { useEffect } from 'react';
-import { Platform, View } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
+import { Platform, StyleSheet, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/colors';
-import { formatTimer } from '@/utils/format';
+import { formatDuration, formatTimer } from '@/utils/format';
+
+type NextSegmentInfo = {
+  name: string;
+  type: 'activity' | 'pause';
+  durationSeconds: number;
+};
 
 type TimerDisplayProps = {
   segmentName: string;
   segmentType: 'activity' | 'pause';
   remaining: number;
   total: number;
+  nextSegment?: NextSegmentInfo;
+  isLastSegment?: boolean;
 };
-
-const RING_SIZE = 220;
-const RING_BORDER = 4;
 
 export const TimerDisplay = ({
   segmentName,
   segmentType,
   remaining,
   total,
+  nextSegment,
+  isLastSegment,
 }: TimerDisplayProps) => {
   const colors = useThemeColors();
-  const progress = useSharedValue(total > 0 ? (total - remaining) / total : 0);
-  const pulseScale = useSharedValue(1);
+  const progressRatio = total > 0 ? (total - remaining) / total : 0;
 
   const phaseColor = segmentType === 'pause' ? colors.pause : colors.activity;
-
-  useEffect(() => {
-    progress.value = withTiming(total > 0 ? (total - remaining) / total : 0, {
-      duration: 300,
-    });
-  }, [remaining, total, progress]);
-
-  useEffect(() => {
-    if (remaining <= 5 && remaining > 0) {
-      pulseScale.value = withRepeat(
-        withSequence(
-          withTiming(1.03, { duration: 400 }),
-          withTiming(1, { duration: 400 }),
-        ),
-        -1,
-        false,
-      );
-    } else {
-      pulseScale.value = withTiming(1, { duration: 200 });
-    }
-  }, [remaining, pulseScale]);
-
-  const progressStyle = useAnimatedStyle(() => ({
-    width: `${progress.value * 100}%`,
-  }));
-
-  const ringPulseStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulseScale.value }],
-  }));
 
   const fontFamily = Platform.select({
     ios: 'ui-rounded',
@@ -70,39 +40,166 @@ export const TimerDisplay = ({
   });
 
   return (
-    <View className="items-center gap-4">
-      <Text
-        className="text-sm font-semibold uppercase tracking-widest"
-        style={{ color: phaseColor }}>
-        {segmentType === 'pause' ? 'PAUSE' : 'ACTIVITY'}
+    <View style={styles.container}>
+      {/* Type label */}
+      <Text style={[styles.typeLabel, { color: phaseColor }]}>
+        {segmentType === 'pause' ? 'REST' : 'FOCUS'}
       </Text>
-      <Text className="text-center text-xl font-semibold">{segmentName}</Text>
 
-      <Animated.View
-        style={[
-          {
-            width: RING_SIZE,
-            height: RING_SIZE,
-            borderRadius: RING_SIZE / 2,
-            borderWidth: RING_BORDER,
-            borderColor: phaseColor,
-          },
-          ringPulseStyle,
-        ]}
-        className="items-center justify-center">
-        <Text
-          className="text-7xl font-extralight"
-          style={{ fontFamily, fontVariant: ['tabular-nums'] }}>
-          {formatTimer(remaining)}
-        </Text>
-      </Animated.View>
+      {/* Segment name */}
+      <Text
+        style={[styles.segmentName, { color: colors.foreground, fontFamily }]}
+        numberOfLines={2}>
+        {segmentName}
+      </Text>
 
-      <View className="h-2 w-full overflow-hidden rounded-full bg-card">
-        <Animated.View
-          className="h-full rounded-full"
-          style={[{ backgroundColor: phaseColor }, progressStyle]}
+      {/* Time — the hero */}
+      <Text style={[styles.time, { color: colors.foreground, fontFamily }]}>
+        {formatTimer(remaining)}
+      </Text>
+
+      {/* Full-width progress bar */}
+      <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+        <View
+          style={[
+            styles.progressFill,
+            {
+              backgroundColor: phaseColor,
+              width: `${progressRatio * 100}%`,
+            },
+          ]}
         />
+      </View>
+
+      {/* Next up card */}
+      {nextSegment ? (
+        <Animated.View entering={FadeIn.delay(200).duration(400)}>
+          <NextUpCard segment={nextSegment} />
+        </Animated.View>
+      ) : isLastSegment ? (
+        <Animated.View entering={FadeIn.delay(200).duration(400)}>
+          <FinishCard />
+        </Animated.View>
+      ) : (
+        <View style={styles.nextUpSpacer} />
+      )}
+    </View>
+  );
+};
+
+const NextUpCard = ({ segment }: { segment: NextSegmentInfo }) => {
+  const colors = useThemeColors();
+  const accentColor = segment.type === 'pause' ? colors.pause : colors.activity;
+
+  return (
+    <View style={[styles.nextCard, { backgroundColor: accentColor + '0A' }]}>
+      <View style={[styles.nextCardAccent, { backgroundColor: accentColor }]} />
+      <View style={styles.nextCardContent}>
+        <Text style={[styles.nextCardLabel, { color: colors.mutedForeground }]}>
+          Next
+        </Text>
+        <Text style={[styles.nextCardName, { color: colors.foreground }]} numberOfLines={1}>
+          {segment.name || 'Untitled'}
+        </Text>
+        <Text style={[styles.nextCardDuration, { color: colors.mutedForeground }]}>
+          {formatDuration(segment.durationSeconds)}
+        </Text>
       </View>
     </View>
   );
 };
+
+const FinishCard = () => {
+  const colors = useThemeColors();
+
+  return (
+    <View style={[styles.nextCard, { backgroundColor: colors.success + '0A' }]}>
+      <View style={[styles.nextCardAccent, { backgroundColor: colors.success }]} />
+      <View style={styles.nextCardContent}>
+        <Text style={[styles.nextCardLabel, { color: colors.mutedForeground }]}>
+          Next
+        </Text>
+        <Text style={[styles.nextCardName, { color: colors.foreground }]}>
+          Finish
+        </Text>
+      </View>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    alignItems: 'center',
+    width: '100%',
+    gap: 4,
+  },
+  typeLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 4,
+    textTransform: 'uppercase',
+  },
+  segmentName: {
+    fontSize: 24,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 30,
+    marginTop: 8,
+  },
+  time: {
+    fontSize: 72,
+    fontWeight: '200',
+    fontVariant: ['tabular-nums'],
+    lineHeight: 82,
+    marginTop: 4,
+  },
+  progressTrack: {
+    width: '80%',
+    height: 3,
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginTop: 16,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  nextUpSpacer: {
+    height: 72,
+  },
+  nextCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 32,
+    width: '80%',
+  },
+  nextCardAccent: {
+    width: 3,
+    alignSelf: 'stretch',
+  },
+  nextCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  nextCardLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  nextCardName: {
+    fontSize: 15,
+    fontWeight: '500',
+    flexShrink: 1,
+  },
+  nextCardDuration: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginLeft: 'auto',
+  },
+});

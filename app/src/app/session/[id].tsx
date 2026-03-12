@@ -1,61 +1,103 @@
 import { useKeepAwake } from 'expo-keep-awake';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   FadeIn,
-  SlideInRight,
   interpolate,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
   withSequence,
+  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { SegmentProgress } from '@/components/segment-progress';
 import { Text } from '@/components/ui/text';
 import { TimerDisplay } from '@/components/timer-display';
 import { useHabit } from '@/hooks/use-habit';
 import { useThemeColors } from '@/lib/colors';
 import { useTimer } from '@/hooks/use-timer';
 import { totalDuration } from '@/utils/format';
+import type { Segment } from '@/types/habit';
 
-type SessionPhase = 'getReady' | 'active' | 'transition';
+type SessionPhase = 'getReady' | 'active';
 
-const GET_READY_SECONDS = 5;
-const TRANSITION_SECONDS = 3;
+const GET_READY_SECONDS = 3;
+const SWIPE_THRESHOLD = 80;
 
 export default function ActiveSessionScreen() {
   useKeepAwake();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { habit, loading } = useHabit(id);
-
+  const colors = useThemeColors();
   const [phase, setPhase] = useState<SessionPhase>('getReady');
   const [segmentIndex, setSegmentIndex] = useState(0);
+  const [slideFrom, setSlideFrom] = useState<'left' | 'right' | null>(null);
   const phaseRef = useRef<SessionPhase>('getReady');
   const segmentIndexRef = useRef(0);
 
   const segments = habit?.segments ?? [];
   const currentSegment = segments[segmentIndex];
+  const nextSegment = segments[segmentIndex + 1];
+  const prevSegment = segmentIndex > 0 ? segments[segmentIndex - 1] : undefined;
 
-  const getTimerDuration = () => {
-    if (phase === 'getReady') return GET_READY_SECONDS;
-    if (phase === 'transition') return TRANSITION_SECONDS;
-    return currentSegment?.durationSeconds ?? 0;
+  const swipeX = useSharedValue(0);
+  const swiped = useSharedValue(false);
+  const isActive = useSharedValue(false);
+
+  // Timer
+  const timerCompleteRef = useRef(() => {});
+  const timer = useTimer({
+    duration: GET_READY_SECONDS,
+    onComplete: () => timerCompleteRef.current(),
+  });
+
+  const goToSegment = (index: number, direction: 'left' | 'right') => {
+    if (index < 0 || index >= segments.length) return;
+    setSlideFrom(direction);
+    segmentIndexRef.current = index;
+    setSegmentIndex(index);
+    const dur = segments[index]?.durationSeconds ?? 0;
+    timer.reset(dur);
+    timer.start();
   };
 
-  const handleTimerComplete = useCallback(() => {
+  // Ref-based handlers for gesture stability
+  const swipeLeftRef = useRef(() => {});
+  const swipeRightRef = useRef(() => {});
+
+  swipeLeftRef.current = () => {
+    const nextIndex = segmentIndexRef.current + 1;
+    if (nextIndex < segments.length) {
+      goToSegment(nextIndex, 'right');
+    }
+  };
+
+  swipeRightRef.current = () => {
+    const prevIndex = segmentIndexRef.current - 1;
+    if (prevIndex >= 0) {
+      goToSegment(prevIndex, 'left');
+    }
+  };
+
+  timerCompleteRef.current = () => {
     const currentPhase = phaseRef.current;
     const currentIndex = segmentIndexRef.current;
 
     if (currentPhase === 'getReady') {
       phaseRef.current = 'active';
+      isActive.value = true;
       setPhase('active');
-    } else if (currentPhase === 'active') {
+      const dur = segments[0]?.durationSeconds ?? 0;
+      timer.reset(dur);
+      timer.start();
+    } else {
       const isLast = habit ? currentIndex >= habit.segments.length - 1 : true;
       if (isLast) {
         if (!habit) return;
@@ -69,45 +111,12 @@ export default function ActiveSessionScreen() {
           },
         });
       } else {
-        const nextIndex = currentIndex + 1;
-        segmentIndexRef.current = nextIndex;
-        setSegmentIndex(nextIndex);
-        phaseRef.current = 'transition';
-        setPhase('transition');
+        goToSegment(currentIndex + 1, 'right');
       }
-    } else if (currentPhase === 'transition') {
-      phaseRef.current = 'active';
-      setPhase('active');
     }
-  }, [habit, router]);
+  };
 
-  const timer = useTimer({
-    duration: getTimerDuration(),
-    onComplete: handleTimerComplete,
-  });
-
-  const prevPhaseRef = useRef<string>('');
-  const prevIndexRef = useRef<number>(-1);
-
-  useEffect(() => {
-    const key = `${phase}-${segmentIndex}`;
-    const prevKey = `${prevPhaseRef.current}-${prevIndexRef.current}`;
-
-    if (key !== prevKey) {
-      prevPhaseRef.current = phase;
-      prevIndexRef.current = segmentIndex;
-
-      let duration = GET_READY_SECONDS;
-      if (phase === 'active') {
-        duration = segments[segmentIndex]?.durationSeconds ?? 0;
-      } else if (phase === 'transition') {
-        duration = TRANSITION_SECONDS;
-      }
-      timer.reset(duration);
-      timer.start();
-    }
-  }, [phase, segmentIndex, segments, timer]);
-
+  // Initial start
   const didStart = useRef(false);
   useEffect(() => {
     if (habit && !didStart.current) {
@@ -128,7 +137,7 @@ export default function ActiveSessionScreen() {
 
   const handleStop = () => {
     timer.pause();
-    Alert.alert('Stop Session', 'Are you sure you want to stop?', [
+    Alert.alert('End Session', 'Are you sure you want to stop?', [
       {
         text: 'Cancel',
         style: 'cancel',
@@ -137,45 +146,166 @@ export default function ActiveSessionScreen() {
         },
       },
       {
-        text: 'Stop',
+        text: 'End',
         style: 'destructive',
         onPress: () => router.back(),
       },
     ]);
   };
 
+  // Swipe gesture
+  const onSwipeLeft = () => swipeLeftRef.current();
+  const onSwipeRight = () => swipeRightRef.current();
+
+  const panGesture = Gesture.Pan()
+    .activeOffsetX([-20, 20])
+    .onStart(() => {
+      swiped.value = false;
+    })
+    .onUpdate((e) => {
+      if (!isActive.value) return;
+      swipeX.value = e.translationX;
+    })
+    .onEnd((e) => {
+      if (!isActive.value) {
+        swipeX.value = withSpring(0);
+        return;
+      }
+      if (e.translationX < -SWIPE_THRESHOLD) {
+        swiped.value = true;
+        runOnJS(onSwipeLeft)();
+      } else if (e.translationX > SWIPE_THRESHOLD) {
+        swiped.value = true;
+        runOnJS(onSwipeRight)();
+      }
+      swipeX.value = withSpring(0, { damping: 20, stiffness: 200 });
+    })
+    .runOnJS(false);
+
+  // Main content follows the finger
+  const swipeStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: interpolate(swipeX.value, [-200, 0, 200], [-40, 0, 40]) },
+    ],
+    opacity: interpolate(
+      Math.abs(swipeX.value),
+      [0, SWIPE_THRESHOLD, 200],
+      [1, 0.7, 0.5],
+    ),
+  }));
+
+  // Right edge peek (next segment) — appears when swiping left, hides after commit
+  const rightPeekStyle = useAnimatedStyle(() => ({
+    opacity: swiped.value ? 0 : interpolate(swipeX.value, [0, -40, -SWIPE_THRESHOLD], [0, 0.4, 1]),
+    transform: [
+      { translateX: interpolate(swipeX.value, [0, -SWIPE_THRESHOLD, -200], [30, 0, -10]) },
+    ],
+  }));
+
+  // Left edge peek (prev segment) — appears when swiping right, hides after commit
+  const leftPeekStyle = useAnimatedStyle(() => ({
+    opacity: swiped.value ? 0 : interpolate(swipeX.value, [0, 40, SWIPE_THRESHOLD], [0, 0.4, 1]),
+    transform: [
+      { translateX: interpolate(swipeX.value, [0, SWIPE_THRESHOLD, 200], [-30, 0, 10]) },
+    ],
+  }));
+
   if (loading || !habit || !currentSegment) {
     return (
-      <View className="flex-1 items-center justify-center bg-background">
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator />
       </View>
     );
   }
 
-  return (
-    <View className="flex-1 bg-background">
-      <SafeAreaView className="flex-1 p-6">
-        <View className="flex-row justify-end">
-          <StopButton onPress={handleStop} />
-        </View>
+  // Subtle background tint based on segment type
+  const segmentColor = currentSegment.type === 'pause' ? colors.pause : colors.activity;
+  const bgTint = phase === 'active' ? segmentColor + '06' : 'transparent';
 
-        <View className="flex-1 items-center justify-center px-6">
-          {phase === 'getReady' ? (
-            <GetReadyPhase remaining={timer.remaining} />
-          ) : phase === 'transition' ? (
-            <TransitionPhase segment={currentSegment} />
+  // Gentle entering animation based on swipe direction
+  const enteringAnim =
+    slideFrom === 'right'
+      ? FadeIn.duration(200)
+      : slideFrom === 'left'
+        ? FadeIn.duration(200)
+        : FadeIn.duration(200);
+
+  return (
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+      {/* Subtle color wash */}
+      {phase === 'active' ? (
+        <Animated.View
+          entering={FadeIn.duration(800)}
+          style={[StyleSheet.absoluteFill, { backgroundColor: bgTint }]}
+        />
+      ) : null}
+
+      <SafeAreaView style={styles.safeArea}>
+        {/* Header */}
+        <View style={styles.header}>
+          <EndButton onPress={handleStop} />
+          <Text style={[styles.habitName, { color: colors.mutedForeground }]}>
+            {habit.name}
+          </Text>
+          {segments.length > 1 ? (
+            <Text style={[styles.stepCounter, { color: colors.mutedForeground }]}>
+              {segmentIndex + 1}
+              <Text style={{ color: colors.border }}> / </Text>
+              {segments.length}
+            </Text>
           ) : (
-            <TimerDisplay
-              segmentName={currentSegment.name || 'Untitled'}
-              segmentType={currentSegment.type}
-              remaining={timer.remaining}
-              total={currentSegment.durationSeconds}
-            />
+            <View style={styles.headerEndSpacer} />
           )}
         </View>
 
-        <View className="items-center gap-6">
-          <SegmentProgress total={segments.length} current={segmentIndex} />
+        {/* Swipeable area */}
+        <GestureDetector gesture={panGesture}>
+          <View style={styles.swipeArea}>
+            {/* Left edge peek — previous segment */}
+            {prevSegment ? (
+              <Animated.View style={[styles.peekLeft, leftPeekStyle]}>
+                <PeekLabel segment={prevSegment} direction="left" />
+              </Animated.View>
+            ) : null}
+
+            {/* Main content */}
+            <Animated.View
+              key={`segment-${segmentIndex}`}
+              entering={enteringAnim}
+              style={[styles.content, swipeStyle]}>
+              {phase === 'getReady' ? (
+                <GetReadyPhase remaining={timer.remaining} />
+              ) : (
+                <TimerDisplay
+                  segmentName={currentSegment.name || 'Untitled'}
+                  segmentType={currentSegment.type}
+                  remaining={timer.remaining}
+                  total={currentSegment.durationSeconds}
+                  nextSegment={
+                    nextSegment
+                      ? {
+                          name: nextSegment.name,
+                          type: nextSegment.type,
+                          durationSeconds: nextSegment.durationSeconds,
+                        }
+                      : undefined
+                  }
+                  isLastSegment={!nextSegment && segments.length > 1}
+                />
+              )}
+            </Animated.View>
+
+            {/* Right edge peek — next segment */}
+            {nextSegment ? (
+              <Animated.View style={[styles.peekRight, rightPeekStyle]}>
+                <PeekLabel segment={nextSegment} direction="right" />
+              </Animated.View>
+            ) : null}
+          </View>
+        </GestureDetector>
+
+        {/* Footer */}
+        <View style={styles.footer}>
           {phase === 'active' ? (
             <PauseResumeButton isRunning={timer.isRunning} onPress={handlePauseResume} />
           ) : null}
@@ -185,6 +315,40 @@ export default function ActiveSessionScreen() {
   );
 }
 
+/* ── Peek Label (edge hint during swipe) ── */
+
+const PeekLabel = ({
+  segment,
+  direction,
+}: {
+  segment: Segment;
+  direction: 'left' | 'right';
+}) => {
+  const colors = useThemeColors();
+  const accentColor = segment.type === 'pause' ? colors.pause : colors.activity;
+  const isLeft = direction === 'left';
+
+  return (
+    <View style={[styles.peekCard, { backgroundColor: accentColor + '12' }]}>
+      <SymbolView
+        name={isLeft ? 'chevron.left' : 'chevron.right'}
+        size={12}
+        tintColor={accentColor}
+      />
+      <View style={styles.peekTextGroup}>
+        <Text style={[styles.peekType, { color: accentColor }]}>
+          {segment.type === 'pause' ? 'Rest' : 'Focus'}
+        </Text>
+        <Text style={[styles.peekName, { color: colors.foreground }]} numberOfLines={1}>
+          {segment.name || 'Untitled'}
+        </Text>
+      </View>
+    </View>
+  );
+};
+
+/* ── Get Ready Phase ── */
+
 const GetReadyPhase = ({ remaining }: { remaining: number }) => {
   const colors = useThemeColors();
   const pulseScale = useSharedValue(1);
@@ -192,7 +356,7 @@ const GetReadyPhase = ({ remaining }: { remaining: number }) => {
   useEffect(() => {
     pulseScale.value = withRepeat(
       withSequence(
-        withTiming(1.05, { duration: 500 }),
+        withTiming(1.06, { duration: 500 }),
         withTiming(1, { duration: 500 }),
       ),
       -1,
@@ -205,16 +369,12 @@ const GetReadyPhase = ({ remaining }: { remaining: number }) => {
   }));
 
   return (
-    <Animated.View entering={FadeIn.duration(300)} className="items-center gap-4">
-      <Text
-        className="text-sm font-semibold uppercase tracking-widest"
-        style={{ color: colors.warning }}>
+    <Animated.View entering={FadeIn.duration(300)} style={styles.getReadyContainer}>
+      <Text style={[styles.getReadyLabel, { color: colors.warning }]}>
         GET READY
       </Text>
       <Animated.View style={pulseStyle}>
-        <Text
-          className="text-7xl font-extralight"
-          style={{ fontFamily: 'ui-rounded', fontVariant: ['tabular-nums'] }}>
+        <Text style={[styles.getReadyCount, { color: colors.foreground, fontFamily: 'ui-rounded' }]}>
           {remaining}
         </Text>
       </Animated.View>
@@ -222,38 +382,14 @@ const GetReadyPhase = ({ remaining }: { remaining: number }) => {
   );
 };
 
-const TransitionPhase = ({
-  segment,
-}: {
-  segment: { name: string; type: 'activity' | 'pause' };
-}) => {
-  const colors = useThemeColors();
-  const phaseColor = segment.type === 'pause' ? colors.pause : colors.activity;
+/* ── End Button ── */
 
-  return (
-    <Animated.View entering={SlideInRight.duration(300)} className="items-center gap-4">
-      <Text className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-        NEXT UP
-      </Text>
-      <Text className="text-3xl font-bold" style={{ fontFamily: 'ui-rounded' }}>
-        {segment.name || 'Untitled'}
-      </Text>
-      <View className="rounded-full px-4 py-1" style={{ backgroundColor: phaseColor + '20' }}>
-        <Text className="text-sm font-semibold" style={{ color: phaseColor }}>
-          {segment.type === 'pause' ? 'Pause' : 'Activity'}
-        </Text>
-      </View>
-    </Animated.View>
-  );
-};
-
-const StopButton = ({ onPress }: { onPress: () => void }) => {
+const EndButton = ({ onPress }: { onPress: () => void }) => {
   const colors = useThemeColors();
   const pressed = useSharedValue(0);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: interpolate(pressed.value, [0, 1], [1, 0.85]) }],
-    opacity: interpolate(pressed.value, [0, 1], [1, 0.6]),
+    opacity: interpolate(pressed.value, [0, 1], [1, 0.5]),
   }));
 
   return (
@@ -265,14 +401,20 @@ const StopButton = ({ onPress }: { onPress: () => void }) => {
       onPressOut={() => {
         pressed.value = withTiming(0, { duration: 150 });
       }}
-      accessibilityLabel="Stop session"
+      hitSlop={12}
+      accessibilityLabel="End session"
       accessibilityRole="button">
-      <Animated.View style={animatedStyle} className="p-2">
-        <SymbolView name="xmark.circle.fill" size={28} tintColor={colors.mutedForeground} />
+      <Animated.View style={[animatedStyle, styles.endButton]}>
+        <SymbolView name="xmark" size={14} tintColor={colors.mutedForeground} />
+        <Text style={[styles.endButtonText, { color: colors.mutedForeground }]}>
+          End
+        </Text>
       </Animated.View>
     </Pressable>
   );
 };
+
+/* ── Pause / Resume Button ── */
 
 const PauseResumeButton = ({
   isRunning,
@@ -301,15 +443,146 @@ const PauseResumeButton = ({
       accessibilityLabel={isRunning ? 'Pause session' : 'Resume session'}
       accessibilityRole="button">
       <Animated.View
-        style={[animatedStyle, { backgroundColor: colors.card }]}
-        className="flex-row items-center gap-2 rounded-full px-6 py-2">
+        style={[animatedStyle, styles.pauseButton, { backgroundColor: colors.card }]}>
         <SymbolView
           name={isRunning ? 'pause.fill' : 'play.fill'}
           size={18}
           tintColor={colors.foreground}
         />
-        <Text className="text-sm font-semibold">{isRunning ? 'Pause' : 'Resume'}</Text>
+        <Text style={[styles.pauseButtonText, { color: colors.foreground }]}>
+          {isRunning ? 'Pause' : 'Resume'}
+        </Text>
       </Animated.View>
     </Pressable>
   );
 };
+
+/* ── Styles ── */
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
+  safeArea: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 24,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 8,
+  },
+  endButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingRight: 8,
+  },
+  endButtonText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  habitName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  stepCounter: {
+    fontSize: 15,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+    minWidth: 40,
+    textAlign: 'right',
+  },
+  headerEndSpacer: {
+    minWidth: 40,
+  },
+  swipeArea: {
+    flex: 1,
+    overflow: 'hidden',
+  },
+  content: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  peekLeft: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  peekRight: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  peekCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  peekTextGroup: {
+    gap: 1,
+  },
+  peekType: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  peekName: {
+    fontSize: 13,
+    fontWeight: '600',
+    maxWidth: 80,
+  },
+  getReadyContainer: {
+    alignItems: 'center',
+    gap: 16,
+  },
+  getReadyLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 4,
+    textTransform: 'uppercase',
+  },
+  getReadyCount: {
+    fontSize: 80,
+    fontWeight: '200',
+    fontVariant: ['tabular-nums'],
+    lineHeight: 90,
+  },
+  footer: {
+    alignItems: 'center',
+    minHeight: 48,
+  },
+  pauseButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 999,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+  },
+  pauseButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+});

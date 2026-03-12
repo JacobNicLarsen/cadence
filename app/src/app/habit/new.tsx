@@ -13,6 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
   FadeIn,
@@ -20,6 +21,7 @@ import Animated, {
   FadeInRight,
   LinearTransition,
   interpolate,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
@@ -55,6 +57,7 @@ export default function NewHabitScreen() {
   const [saving, setSaving] = useState(false);
 
   const nameInputRef = useRef<TextInput>(null);
+  const swipeX = useSharedValue(0);
 
   const handleSave = async () => {
     const hasNamedSegment = segments.some((s) => s.name.trim().length > 0);
@@ -104,13 +107,34 @@ export default function NewHabitScreen() {
     }
   };
 
+  const swipeGesture = Gesture.Pan()
+    .activeOffsetX([-30, 30])
+    .onUpdate((e) => {
+      swipeX.value = e.translationX;
+    })
+    .onEnd((e) => {
+      if (e.translationX < -80) {
+        runOnJS(handleNext)();
+      } else if (e.translationX > 80) {
+        runOnJS(handleBack)();
+      }
+      swipeX.value = withSpring(0);
+    })
+    .runOnJS(false);
+
+  const swipeStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: interpolate(swipeX.value, [-200, 0, 200], [-20, 0, 20]) },
+    ],
+  }));
+
   return (
     <View style={styles.container} className="bg-background">
       <SafeAreaView style={styles.flex}>
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={10}>
+          keyboardVerticalOffset={60}>
           {/* Top bar */}
           <Animated.View style={styles.topBar} layout={LinearTransition.springify()}>
             <Pressable
@@ -129,36 +153,35 @@ export default function NewHabitScreen() {
             <View style={styles.backButton} />
           </Animated.View>
 
-          {/* Step content */}
-          <View style={styles.content}>
-            {step === 0 ? (
-              <StepName
-                key="step-name"
-                name={name}
-                onNameChange={setName}
-                inputRef={nameInputRef}
-                colors={colors}
-                onSubmit={handleNext}
-
-              />
-            ) : step === 1 ? (
-              <StepSchedule
-                key="step-schedule"
-                scheduledDays={scheduledDays}
-                onScheduledDaysChange={setScheduledDays}
-                colors={colors}
-
-              />
-            ) : (
-              <StepSegments
-                key="step-segments"
-                segments={segments}
-                onSegmentsChange={setSegments}
-                colors={colors}
-
-              />
-            )}
-          </View>
+          {/* Step content — swipeable */}
+          <GestureDetector gesture={swipeGesture}>
+            <Animated.View style={[styles.content, swipeStyle]}>
+              {step === 0 ? (
+                <StepName
+                  key="step-name"
+                  name={name}
+                  onNameChange={setName}
+                  inputRef={nameInputRef}
+                  colors={colors}
+                  onSubmit={handleNext}
+                />
+              ) : step === 1 ? (
+                <StepSchedule
+                  key="step-schedule"
+                  scheduledDays={scheduledDays}
+                  onScheduledDaysChange={setScheduledDays}
+                  colors={colors}
+                />
+              ) : (
+                <StepSegments
+                  key="step-segments"
+                  segments={segments}
+                  onSegmentsChange={setSegments}
+                  colors={colors}
+                />
+              )}
+            </Animated.View>
+          </GestureDetector>
 
           {/* Bottom action */}
           <View style={styles.bottomBar}>
