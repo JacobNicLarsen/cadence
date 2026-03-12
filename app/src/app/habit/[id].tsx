@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Alert, View } from 'react-native';
 
 import { HabitForm } from '@/components/habit-form';
 import { useHabit } from '@/hooks/use-habit';
@@ -28,20 +28,28 @@ export default function EditHabitScreen() {
 
   const handleSave = async () => {
     if (!habit) return;
-    await saveHabit({
-      ...habit,
-      name: name.trim(),
-      segments,
-      scheduledDays,
-      updatedAt: Date.now(),
-    });
-    router.back();
+    try {
+      await saveHabit({
+        ...habit,
+        name: name.trim(),
+        segments,
+        scheduledDays,
+        updatedAt: Date.now(),
+      });
+      router.back();
+    } catch {
+      Alert.alert('Save Failed', 'Could not save changes. Please try again.');
+    }
   };
 
   const handleDelete = async () => {
     if (!habit) return;
-    await deleteHabit(habit.id);
-    router.back();
+    try {
+      await deleteHabit(habit.id);
+      router.back();
+    } catch {
+      Alert.alert('Delete Failed', 'Could not delete habit. Please try again.');
+    }
   };
 
   if (loading || !initialized) {

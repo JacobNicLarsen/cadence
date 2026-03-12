@@ -95,7 +95,9 @@ export default function HomeScreen() {
             <Pressable
               onPress={() => router.push('/habits-list')}
               hitSlop={8}
-              style={styles.manageButton}>
+              style={styles.manageButton}
+              accessibilityLabel="Manage habits"
+              accessibilityRole="button">
               <SymbolView name="list.bullet" size={20} tintColor={colors.foreground} />
             </Pressable>
           ) : null}
@@ -201,7 +203,9 @@ const FAB = ({ onPress, color }: { onPress: () => void; color: string }) => {
       }}
       onPressOut={() => {
         pressed.value = withSpring(0, { damping: 12, stiffness: 200 });
-      }}>
+      }}
+      accessibilityLabel="Create new habit"
+      accessibilityRole="button">
       <Animated.View style={[animatedStyle, styles.fab, { backgroundColor: color }]}>
         <SymbolView name="plus" size={24} tintColor="#ffffff" />
       </Animated.View>

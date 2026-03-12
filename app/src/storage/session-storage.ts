@@ -4,9 +4,13 @@ import type { SessionRecord } from '@/types/habit';
 const STORAGE_KEY = '@cadence/sessions';
 
 export const getSessionRecords = async (): Promise<SessionRecord[]> => {
-  const json = await AsyncStorage.getItem(STORAGE_KEY);
-  if (!json) return [];
-  return JSON.parse(json);
+  try {
+    const json = await AsyncStorage.getItem(STORAGE_KEY);
+    if (!json) return [];
+    return JSON.parse(json) as SessionRecord[];
+  } catch {
+    return [];
+  }
 };
 
 export const saveSessionRecord = async (

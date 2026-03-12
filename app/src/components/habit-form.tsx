@@ -147,7 +147,11 @@ export const HabitForm = ({
           {DAYS.map(({ key, label }) => {
             const selected = scheduledDays.includes(key);
             return (
-              <Pressable key={key} onPress={() => toggleDay(key)}>
+              <Pressable
+                key={key}
+                onPress={() => toggleDay(key)}
+                accessibilityLabel={`${key}, ${selected ? 'selected' : 'not selected'}`}
+                accessibilityRole="button">
                 <View
                   style={[
                     styles.dayCircle,
@@ -187,7 +191,7 @@ export const HabitForm = ({
               colors={colors}
             />
           ))}
-          <Pressable onPress={addSegment}>
+          <Pressable onPress={addSegment} accessibilityLabel="Add segment" accessibilityRole="button">
             <View style={[styles.addButton, { borderColor: colors.border }]}>
               <SymbolView name="plus" size={14} tintColor={colors.mutedForeground} />
               <Text style={[styles.addButtonText, { color: colors.mutedForeground }]}>
@@ -225,7 +229,7 @@ export const HabitForm = ({
 
       {/* Delete */}
       {isEdit && onDelete ? (
-        <Pressable onPress={handleDelete} style={styles.deleteRow}>
+        <Pressable onPress={handleDelete} style={styles.deleteRow} accessibilityLabel="Delete habit" accessibilityRole="button">
           <SymbolView name="trash" size={14} tintColor={colors.destructive} />
           <Text style={[styles.deleteText, { color: colors.destructive }]}>
             Delete Habit
@@ -274,7 +278,7 @@ const SegmentCard = ({
       <View style={styles.segmentContent}>
         {/* Type toggle + delete */}
         <View style={styles.segmentTopRow}>
-          <Pressable onPress={handleToggle}>
+          <Pressable onPress={handleToggle} accessibilityLabel={`Switch to ${isActivity ? 'rest' : 'activity'}`} accessibilityRole="button">
             <View style={[styles.typeToggle, { backgroundColor: colors.card }]}>
               <Animated.View
                 style={[
@@ -300,7 +304,7 @@ const SegmentCard = ({
             </View>
           </Pressable>
           {total > 1 ? (
-            <Pressable onPress={onDelete} hitSlop={12}>
+            <Pressable onPress={onDelete} hitSlop={12} accessibilityLabel="Delete segment" accessibilityRole="button">
               <View style={styles.segmentDeleteBtn}>
                 <SymbolView name="trash" size={14} tintColor={colors.destructive} />
               </View>
@@ -386,7 +390,9 @@ const StepperButton = ({
       }}
       onPressOut={() => {
         pressed.value = withTiming(0, { duration: 150 });
-      }}>
+      }}
+      accessibilityLabel={icon === 'minus' ? 'Decrease duration' : 'Increase duration'}
+      accessibilityRole="button">
       <Animated.View
         style={[animatedStyle, styles.stepperBtn, { backgroundColor: colors.muted }]}>
         <SymbolView name={icon} size={12} tintColor={colors.mutedForeground} />

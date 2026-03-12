@@ -4,10 +4,14 @@ import type { Habit } from '@/types/habit';
 const STORAGE_KEY = '@cadence/habits';
 
 export const getHabits = async (): Promise<Habit[]> => {
-  const json = await AsyncStorage.getItem(STORAGE_KEY);
-  if (!json) return [];
-  const habits: Habit[] = JSON.parse(json);
-  return habits.sort((a, b) => b.createdAt - a.createdAt);
+  try {
+    const json = await AsyncStorage.getItem(STORAGE_KEY);
+    if (!json) return [];
+    const habits: Habit[] = JSON.parse(json);
+    return habits.sort((a, b) => b.createdAt - a.createdAt);
+  } catch {
+    return [];
+  }
 };
 
 export const getHabit = async (id: string): Promise<Habit | null> => {

@@ -44,6 +44,8 @@ export default function CompleteScreen() {
       completedAt: Date.now(),
       totalDurationSeconds: Number(totalDuration),
       segmentsCompleted: Number(segmentsCompleted),
+    }).catch(() => {
+      // Session completed successfully even if record fails to persist
     });
   }, [habitId, habitName, totalDuration, segmentsCompleted]);
 
@@ -215,7 +217,9 @@ const DoneButton = ({ onPress, color }: { onPress: () => void; color: string }) 
     <GestureDetector gesture={tap}>
       <Animated.View
         style={[animatedStyle, { backgroundColor: color }]}
-        className="items-center rounded-md py-4 shadow-sm shadow-black/5">
+        className="items-center rounded-md py-4 shadow-sm shadow-black/5"
+        accessibilityLabel="Done"
+        accessibilityRole="button">
         <Text className="text-base font-semibold text-white">Done</Text>
       </Animated.View>
     </GestureDetector>

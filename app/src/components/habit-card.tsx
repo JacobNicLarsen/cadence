@@ -43,7 +43,9 @@ export const HabitCard = ({ habit, onPress, onEdit, index = 0 }: HabitCardProps)
         }}
         onPressOut={() => {
           pressed.value = withSpring(0, { damping: 15, stiffness: 200 });
-        }}>
+        }}
+        accessibilityLabel={`Start ${habit.name}, ${formatDuration(duration)}`}
+        accessibilityRole="button">
         <Animated.View style={animatedStyle}>
           <View style={[styles.card, { backgroundColor: colors.card }]}>
             {/* Accent stripe */}
@@ -58,7 +60,12 @@ export const HabitCard = ({ habit, onPress, onEdit, index = 0 }: HabitCardProps)
                   {habit.name}
                 </Text>
                 {onEdit ? (
-                  <Pressable onPress={onEdit} hitSlop={12} style={styles.editButton}>
+                  <Pressable
+                    onPress={onEdit}
+                    hitSlop={12}
+                    style={styles.editButton}
+                    accessibilityLabel={`Edit ${habit.name}`}
+                    accessibilityRole="button">
                     <SymbolView name="ellipsis" size={16} tintColor={colors.mutedForeground} />
                   </Pressable>
                 ) : null}

@@ -264,7 +264,9 @@ const StopButton = ({ onPress }: { onPress: () => void }) => {
       }}
       onPressOut={() => {
         pressed.value = withTiming(0, { duration: 150 });
-      }}>
+      }}
+      accessibilityLabel="Stop session"
+      accessibilityRole="button">
       <Animated.View style={animatedStyle} className="p-2">
         <SymbolView name="xmark.circle.fill" size={28} tintColor={colors.mutedForeground} />
       </Animated.View>
@@ -295,7 +297,9 @@ const PauseResumeButton = ({
       }}
       onPressOut={() => {
         pressed.value = withTiming(0, { duration: 200 });
-      }}>
+      }}
+      accessibilityLabel={isRunning ? 'Pause session' : 'Resume session'}
+      accessibilityRole="button">
       <Animated.View
         style={[animatedStyle, { backgroundColor: colors.card }]}
         className="flex-row items-center gap-2 rounded-full px-6 py-2">

@@ -1,12 +1,16 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
+  Easing,
+  FadeIn,
   FadeInDown,
   interpolate,
   useAnimatedStyle,
   useSharedValue,
+  withRepeat,
+  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -40,7 +44,12 @@ export default function HabitsListScreen() {
           <Text style={[styles.title, { fontFamily: 'ui-rounded' }]}>
             Habits
           </Text>
-          <Pressable onPress={() => router.back()} hitSlop={8} style={styles.closeButton}>
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={8}
+            style={styles.closeButton}
+            accessibilityLabel="Close"
+            accessibilityRole="button">
             <SymbolView name="xmark.circle.fill" size={28} tintColor={colors.mutedForeground} />
           </Pressable>
         </View>
@@ -48,7 +57,11 @@ export default function HabitsListScreen() {
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}>
-          {habits.length > 0 ? (
+          {loading ? (
+            [0, 1, 2].map((i) => (
+              <SkeletonRow key={i} index={i} colors={colors} />
+            ))
+          ) : habits.length > 0 ? (
             habits.map((habit, index) => (
               <HabitRow
                 key={habit.id}
@@ -57,7 +70,7 @@ export default function HabitsListScreen() {
                 index={index}
               />
             ))
-          ) : loading ? null : (
+          ) : (
             <View style={styles.emptyState}>
               <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
                 No habits yet
@@ -69,6 +82,46 @@ export default function HabitsListScreen() {
     </View>
   );
 }
+
+const SkeletonRow = ({
+  index,
+  colors,
+}: {
+  index: number;
+  colors: ReturnType<typeof useThemeColors>;
+}) => {
+  const pulse = useSharedValue(0.4);
+
+  useEffect(() => {
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 800, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.4, { duration: 800, easing: Easing.inOut(Easing.ease) }),
+      ),
+      -1,
+    );
+  }, [pulse]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: pulse.value,
+  }));
+
+  return (
+    <Animated.View
+      entering={FadeIn.delay(index * 80).duration(250)}
+      style={[styles.row, { borderBottomColor: colors.border }]}>
+      <Animated.View style={animatedStyle}>
+        <View style={styles.skeletonRowInner}>
+          <View style={[styles.skeletonDot, { backgroundColor: colors.border }]} />
+          <View style={styles.skeletonLines}>
+            <View style={[styles.skeletonLine, { width: '55%', backgroundColor: colors.border }]} />
+            <View style={[styles.skeletonLine, { width: '80%', backgroundColor: colors.border }]} />
+          </View>
+        </View>
+      </Animated.View>
+    </Animated.View>
+  );
+};
 
 const HabitRow = ({
   habit,
@@ -100,7 +153,9 @@ const HabitRow = ({
         }}
         onPressOut={() => {
           pressed.value = withTiming(0, { duration: 150 });
-        }}>
+        }}
+        accessibilityLabel={`Edit ${habit.name}`}
+        accessibilityRole="button">
         <Animated.View style={animatedStyle}>
           <View style={[styles.row, { borderBottomColor: colors.border }]}>
             <View style={[styles.dot, { backgroundColor: accentColor }]} />
@@ -149,6 +204,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     letterSpacing: -0.3,
+    lineHeight: 34,
   },
   closeButton: {
     padding: 4,
@@ -194,5 +250,23 @@ const styles = StyleSheet.create({
   },
   rowDot: {
     fontSize: 13,
+  },
+  skeletonRowInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  skeletonDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  skeletonLines: {
+    flex: 1,
+    gap: 8,
+  },
+  skeletonLine: {
+    height: 10,
+    borderRadius: 5,
   },
 });

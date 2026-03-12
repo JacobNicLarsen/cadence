@@ -47,7 +47,6 @@ export default function NewHabitScreen() {
   const colors = useThemeColors();
 
   const [step, setStep] = useState(0);
-  const [direction, setDirection] = useState<'forward' | 'back'>('forward');
   const [name, setName] = useState('');
   const [scheduledDays, setScheduledDays] = useState<DayOfWeek[]>(ALL_DAYS);
   const [segments, setSegments] = useState<Segment[]>([
@@ -64,16 +63,21 @@ export default function NewHabitScreen() {
       return;
     }
     setSaving(true);
-    const now = Date.now();
-    await saveHabit({
-      id: generateId(),
-      name: name.trim(),
-      segments,
-      scheduledDays,
-      createdAt: now,
-      updatedAt: now,
-    });
-    router.back();
+    try {
+      const now = Date.now();
+      await saveHabit({
+        id: generateId(),
+        name: name.trim(),
+        segments,
+        scheduledDays,
+        createdAt: now,
+        updatedAt: now,
+      });
+      router.back();
+    } catch {
+      Alert.alert('Save Failed', 'Could not create habit. Please try again.');
+      setSaving(false);
+    }
   };
 
   const canAdvance = () => {
@@ -86,7 +90,6 @@ export default function NewHabitScreen() {
     Keyboard.dismiss();
     if (!canAdvance()) return;
     if (step < STEPS.length - 1) {
-      setDirection('forward');
       setStep(step + 1);
     } else {
       handleSave();
@@ -95,7 +98,6 @@ export default function NewHabitScreen() {
 
   const handleBack = () => {
     if (step > 0) {
-      setDirection('back');
       setStep(step - 1);
     } else {
       router.back();
@@ -111,7 +113,12 @@ export default function NewHabitScreen() {
           keyboardVerticalOffset={10}>
           {/* Top bar */}
           <Animated.View style={styles.topBar} layout={LinearTransition.springify()}>
-            <Pressable onPress={handleBack} hitSlop={12} style={styles.backButton}>
+            <Pressable
+              onPress={handleBack}
+              hitSlop={12}
+              style={styles.backButton}
+              accessibilityLabel={step === 0 ? 'Close' : 'Go back'}
+              accessibilityRole="button">
               <SymbolView
                 name={step === 0 ? 'xmark' : 'chevron.left'}
                 size={18}
@@ -132,7 +139,7 @@ export default function NewHabitScreen() {
                 inputRef={nameInputRef}
                 colors={colors}
                 onSubmit={handleNext}
-                direction={direction}
+
               />
             ) : step === 1 ? (
               <StepSchedule
@@ -140,7 +147,7 @@ export default function NewHabitScreen() {
                 scheduledDays={scheduledDays}
                 onScheduledDaysChange={setScheduledDays}
                 colors={colors}
-                direction={direction}
+
               />
             ) : (
               <StepSegments
@@ -148,7 +155,7 @@ export default function NewHabitScreen() {
                 segments={segments}
                 onSegmentsChange={setSegments}
                 colors={colors}
-                direction={direction}
+
               />
             )}
           </View>
@@ -170,8 +177,6 @@ export default function NewHabitScreen() {
 }
 
 /* ── Progress Dots ── */
-
-const AnimatedDot = Animated.createAnimatedComponent(View);
 
 const ProgressDots = ({
   current,
@@ -207,23 +212,18 @@ const ProgressDots = ({
 
 const StaggerChild = ({
   index,
-  direction,
   children,
 }: {
   index: number;
-  direction: 'forward' | 'back';
   children: React.ReactNode;
-}) => {
-  const enterFrom = direction === 'forward' ? FadeInRight : FadeInRight; // always slide in from appropriate side
-  return (
-    <Animated.View
-      entering={FadeInDown.delay(index * 60)
-        .duration(350)
-        .easing(Easing.out(Easing.cubic))}>
-      {children}
-    </Animated.View>
-  );
-};
+}) => (
+  <Animated.View
+    entering={FadeInDown.delay(index * 60)
+      .duration(350)
+      .easing(Easing.out(Easing.cubic))}>
+    {children}
+  </Animated.View>
+);
 
 /* ── Step 1: Name ── */
 
@@ -233,19 +233,19 @@ const StepName = ({
   inputRef,
   colors,
   onSubmit,
-  direction,
+
 }: {
   name: string;
   onNameChange: (n: string) => void;
   inputRef: React.RefObject<TextInput | null>;
   colors: ReturnType<typeof useThemeColors>;
   onSubmit: () => void;
-  direction: 'forward' | 'back';
+
 }) => (
   <Animated.View
     entering={FadeInRight.duration(350).easing(Easing.out(Easing.cubic))}
     style={styles.stepContainer}>
-    <StaggerChild index={0} direction={direction}>
+    <StaggerChild index={0}>
       <View style={styles.stepHeader}>
         <Text style={[styles.stepTitle, { fontFamily: 'ui-rounded' }]}>
           What habit are you building?
@@ -256,7 +256,7 @@ const StepName = ({
       </View>
     </StaggerChild>
 
-    <StaggerChild index={1} direction={direction}>
+    <StaggerChild index={1}>
       <Animated.View
         style={[
           styles.nameInputContainer,
@@ -287,7 +287,7 @@ const StepName = ({
 
     <View style={styles.suggestions}>
       {['Morning Routine', 'Focus Session', 'Workout', 'Meditation'].map((suggestion, i) => (
-        <StaggerChild key={suggestion} index={i + 2} direction={direction}>
+        <StaggerChild key={suggestion} index={i + 2}>
           <SuggestionChip
             label={suggestion}
             onPress={() => onNameChange(suggestion)}
@@ -356,12 +356,12 @@ const StepSchedule = ({
   scheduledDays,
   onScheduledDaysChange,
   colors,
-  direction,
+
 }: {
   scheduledDays: DayOfWeek[];
   onScheduledDaysChange: (days: DayOfWeek[]) => void;
   colors: ReturnType<typeof useThemeColors>;
-  direction: 'forward' | 'back';
+
 }) => {
   const toggleDay = (day: DayOfWeek) => {
     if (scheduledDays.includes(day)) {
@@ -383,7 +383,7 @@ const StepSchedule = ({
     <Animated.View
       entering={FadeInRight.duration(350).easing(Easing.out(Easing.cubic))}
       style={styles.stepContainer}>
-      <StaggerChild index={0} direction={direction}>
+      <StaggerChild index={0}>
         <View style={styles.stepHeader}>
           <Text style={[styles.stepTitle, { fontFamily: 'ui-rounded' }]}>
             When do you practice?
@@ -395,7 +395,7 @@ const StepSchedule = ({
       </StaggerChild>
 
       {/* Quick presets */}
-      <StaggerChild index={1} direction={direction}>
+      <StaggerChild index={1}>
         <View style={styles.presetsRow}>
           {PRESETS.map((preset) => {
             const active = isPresetActive(preset.days);
@@ -417,7 +417,7 @@ const StepSchedule = ({
         {DAYS.map(({ key, label, full }, i) => {
           const selected = scheduledDays.includes(key);
           return (
-            <StaggerChild key={key} index={i + 2} direction={direction}>
+            <StaggerChild key={key} index={i + 2}>
               <DayButton
                 dayKey={key}
                 label={label}
@@ -549,12 +549,12 @@ const StepSegments = ({
   segments,
   onSegmentsChange,
   colors,
-  direction,
+
 }: {
   segments: Segment[];
   onSegmentsChange: (segments: Segment[]) => void;
   colors: ReturnType<typeof useThemeColors>;
-  direction: 'forward' | 'back';
+
 }) => {
   const addSegment = (type: 'activity' | 'pause') => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -589,7 +589,7 @@ const StepSegments = ({
     <Animated.View
       entering={FadeInRight.duration(350).easing(Easing.out(Easing.cubic))}
       style={styles.stepContainer}>
-      <StaggerChild index={0} direction={direction}>
+      <StaggerChild index={0}>
         <View style={styles.stepHeader}>
           <Text style={[styles.stepTitle, { fontFamily: 'ui-rounded' }]}>
             Build your flow
@@ -619,7 +619,7 @@ const StepSegments = ({
         ))}
 
         {/* Add segment buttons */}
-        <StaggerChild index={segments.length + 1} direction={direction}>
+        <StaggerChild index={segments.length + 1}>
           <View style={styles.addButtons}>
             <Pressable onPress={() => addSegment('activity')} style={styles.addButtonFlex}>
               <View style={[styles.addSegmentButton, { borderColor: colors.activity + '40' }]}>
