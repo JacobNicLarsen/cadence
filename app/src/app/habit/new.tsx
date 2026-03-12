@@ -717,6 +717,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     letterSpacing: -0.3,
+    lineHeight: 34,
   },
   stepSubtitle: {
     fontSize: 16,
