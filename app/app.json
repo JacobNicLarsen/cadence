@@ -8,8 +8,11 @@
     "scheme": "cadence",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "bundleIdentifier": "com.cadence",
-      "icon": "./assets/expo.icon"
+      "bundleIdentifier": "com.jacobniclarsen.cadence",
+      "icon": "./assets/expo.icon",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -41,6 +44,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "7488a138-9bda-40db-943c-0932a9304cf5"
+      }
+    },
+    "owner": "jacobniclarsen"
   }
 }
